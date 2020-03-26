@@ -1,7 +1,7 @@
 import numpy as np
-from src.models import Sequential
-from src.layers import Activation, Dense
-from src.utils import getXY, LoadBatch, prob_to_class
+from mlp.models import Sequential
+from mlp.layers import Activation, Dense
+from mlp.utils import getXY, LoadBatch, prob_to_class
 
 np.random.seed(0)
 
