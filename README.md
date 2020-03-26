@@ -1,6 +1,6 @@
 # DeepLearning Framework PlayGround
 
-Simple Keras-inspired DeepLearning Framework in Python with Numpy backend.
+Simple Keras-inspired DeepLearning Framework Python implementation using Numpy backend.
 As all my other repos, this is more an exercise for me to make sure I understand the maim Deep Learning architectures and algorithms, rather than useful code.
 Hope it also helps you understand them!
 
