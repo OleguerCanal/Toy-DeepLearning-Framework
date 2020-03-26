@@ -26,8 +26,8 @@ The model now presents the following features:
 
 Code Example:
 ```python
-from src.layers import Activation, Dense
-from src.models import Sequential
+from mlp.layers import Activation, Dense
+from mlp.models import Sequential
 
 # Define model
 model = Sequential(loss="cross_entropy")

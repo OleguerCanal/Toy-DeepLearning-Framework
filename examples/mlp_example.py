@@ -1,3 +1,6 @@
+import sys, pathlib
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
+
 import numpy as np
 from mlp.models import Sequential
 from mlp.layers import Activation, Dense

@@ -118,7 +118,7 @@ class Sequential:
             ax1.plot(list(range(len(self.val_losses))),
                      self.val_losses, label="Val loss", c="red")
         ax1.tick_params(axis='y')
-        plt.legend(loc='upper right')
+        plt.legend(loc='center right')
         
         # Accuracies
         ax2 = ax1.twinx()
@@ -134,7 +134,7 @@ class Sequential:
         
         # fig.tight_layout()
         plt.title("Training Evolution")
-        plt.legend(loc='center right')
+        plt.legend(loc='upper right')
         
         if save:
             plt.savefig("figures/" + name + ".png")
