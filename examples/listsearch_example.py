@@ -12,7 +12,7 @@ import numpy as np
 np.random.seed(0)
 
 # Define evaluator (function to run in MetaParamOptimizer)
-def evaluator(x_train, y_train, x_val, y_val, **kwargs):
+def evaluator(x_train, y_train, x_val, y_val, experiment_path="", **kwargs):
     # Define model
     model = Sequential(loss="cross_entropy")
     model.add(
@@ -22,11 +22,11 @@ def evaluator(x_train, y_train, x_val, y_val, **kwargs):
     # Fit model
     model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val, **kwargs)
     model.plot_training_progress(show=False, save=True, name="figures/" + dict_to_string(kwargs))
-    # model.save("models/" + dict_to_string(kwargs))
+    model.save(experiment_path + "/" + dict_to_string(kwargs))
 
-    # Minimizing value:
-    value = model.get_classification_metrics(x_val, y_val)[0] # Get accuracy
-    result = {"value": value, "model": model}  # Save score and model
+    # Minimizing value: validation accuracy
+    val_acc = model.get_classification_metrics(x_val, y_val)[0] # Get accuracy
+    result = {"value": val_acc, "model": model}  # Save score and model
     return result
 
 if __name__ == "__main__":
@@ -45,28 +45,31 @@ if __name__ == "__main__":
     x_val = (x_val - mean_x)/std_x
     x_test = (x_test - mean_x)/std_x
 
-    # Define search space (optimization over those)
-    search_space = {
-        "batch_size": [100, 200],
-        "lr": [0.001, 0.1],
-        "l2_reg": [0.1]
-    }
-    # Define fixed params (constant trhough optimization)
+    # Define list of parameters to try
+    dicts_list = [
+        { "l2_reg": 0.0, "lr": 0.1 },
+        { "l2_reg": 0.0, "lr": 0.001 },
+        { "l2_reg": 0.1, "lr": 0.001 },
+        { "l2_reg": 1.0, "lr": 0.001 },
+    ]
+    # Define fixed params (constant through optimization)
     fixed_args = {
+        "experiment_path" : "models/list_search/",
         "x_train" : x_train,
         "y_train" : y_train,
         "x_val" : x_val,
         "y_val" : y_val,
-        "epochs" : 10,
+        "batch_size": 100,
+        "epochs" : 40,
         "momentum" : 0.0,
     }
     # NOTE: The union of both dictionaries should contain all evaluator parameters
 
     # Perform optimization
-    mpo = MetaParamOptimizer()
-    best_model, max_params = mpo.grid_search(evaluator=evaluator,
-                                            search_space=search_space,
-                                            fixed_args=fixed_args)
+    mpo = MetaParamOptimizer(save_path=fixed_args["experiment_path"])
+    best_model = mpo.list_search(evaluator=evaluator,
+                                dicts_list=dicts_list,
+                                fixed_args=fixed_args)
 
     # Test model
     test_acc, test_loss = best_model["model"].get_classification_metrics(x_test, y_test)

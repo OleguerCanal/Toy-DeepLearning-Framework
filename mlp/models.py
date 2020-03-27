@@ -113,18 +113,21 @@ class Sequential:
         plt.legend(loc='upper right')
 
         if save:
+            directory = "/".join(name.split("/")[:-1])
+            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
             plt.savefig(name + ".png")
         if show:
             plt.show()
 
     def save(self, path):
         """ Saves current model to disk (Dont put file extension)"""
+        directory = "/".join(path.split("/")[:-1])
+        pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
         with open(path + ".pkl", 'wb') as output:
             pickle.dump(self.__dict__, output, pickle.HIGHEST_PROTOCOL)
 
     def load(self, path):
         """ Loads model to disk (Dont put file extension)"""
-        print("loading")
         with open(path + ".pkl", 'rb') as input:
             tmp_dict = pickle.load(input)
             self.__dict__.update(tmp_dict)

@@ -56,7 +56,7 @@ print("Test accuracy:", test_acc)
 Metaparameter Optimization is commonly used when training these kind of models. To ease the process I implemented a MetaParamOptimizer class with functions such as Grid Search (working on Gaussian Process Regression Optimization [here](https://github.com/fedetask/hyperparameter-optimization)):
 
 1. Define the **search space** and **fixed args** and a of your model in two diferent dictionaries
-2. Define an **evaluator** function which trains and evaluates your model in joined arguments, this function should return a ``dictionary`` with at least the key **"value"**. Which MetaParamOptimizer will optimize
+2. Define an **evaluator** function which trains and evaluates your model in joined arguments, this function should return a ``dictionary`` with at least the key **"value"** (which MetaParamOptimizer will optimize).
 
 Code example:
 ```python
@@ -88,16 +88,16 @@ def evaluator(x_train, y_train, x_val, y_val, **kwargs):
     model.plot_training_progress(show=False, save=True, name="figures/" + dict_to_string(kwargs)
     model.save("models/" + dict_to_string(kwargs))
 
-    # Minimizing value:
+    # Evaluator result (add model to retain best)
     value = model.get_classification_metrics(x_val, y_val)[0] # Get accuracy
-    result = {"value": value, "model": model}  # MetaParamOptimizer will maximize value field
+    result = {"value": value, "model": model}  # MetaParamOptimizer will maximize value
     return result
 
 # Get best model and best prams
 mpo = MetaParamOptimizer(save_path="models/")
-best_model, max_params = mpo.grid_search(evaluator=evaluator,
-                                        search_space=search_space,
-                                        fixed_args=fixed_args)
+best_model = mpo.grid_search(evaluator=evaluator,
+                            search_space=search_space,
+                            fixed_args=fixed_args)
 # This will perform 3x3x3 = 27 trainings of all combinations of search_space params
 ```
 
