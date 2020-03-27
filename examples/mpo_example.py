@@ -53,12 +53,10 @@ if __name__ == "__main__":
     }
     # Define fixed params (constant trhough optimization)
     fixed_args = {
-        # Data
         "x_train" : x_train,
         "y_train" : y_train,
         "x_val" : x_val,
         "y_val" : y_val,
-        # Other args
         "epochs" : 10,
         "momentum" : 0.0,
     }

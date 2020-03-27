@@ -53,3 +53,53 @@ print("Test accuracy:", test_acc)
 
 ## Meta-Parameter Optimization (MPO)
 
+Metaparameter Optimization is commonly used when training these kind of models. To ease the process I implemented a MetaParamOptimizer class with functions such as Grid Search (working on Gaussian Process Regression Optimization [here](https://github.com/fedetask/hyperparameter-optimization)):
+
+1. Define the **search space** and **fixed args** and a of your model in two diferent dictionaries
+2. Define an **evaluator** function which trains and evaluates your model in joined arguments, this function should return a ``dictionary`` with at least the key **"value"**. Which MetaParamOptimizer will optimize
+
+Code example:
+```python
+from mpo.metaparamoptimizer import MetaParamOptimizer
+from util.misc import dict_to_string
+
+search_space = {  # Optimization will be performef over these params
+    "batch_size": [100, 200, 400],
+    "lr": [0.001, 0.01, 0.1],
+    "l2_reg": [0.01, 0.1]
+}
+fixed_args = {  # These will be kept constant
+    "x_train" : x_train,
+    "y_train" : y_train,
+    "x_val" : x_val,
+    "y_val" : y_val,
+    "epochs" : 100,
+    "momentum" : 0.1,
+}
+
+def evaluator(x_train, y_train, x_val, y_val, **kwargs):
+    # Define model
+    model = Sequential(loss="cross_entropy")
+    model.add(Dense(nodes=10, input_dim=x_train.shape[0]))
+    model.add(Activation("softmax"))
+
+    # Fit model
+    model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val, **kwargs)
+    model.plot_training_progress(show=False, save=True, name="figures/" + dict_to_string(kwargs)
+    model.save("models/" + dict_to_string(kwargs))
+
+    # Minimizing value:
+    value = model.get_classification_metrics(x_val, y_val)[0] # Get accuracy
+    result = {"value": value, "model": model}  # MetaParamOptimizer will maximize value field
+    return result
+
+# Get best model and best prams
+mpo = MetaParamOptimizer(save_path="models/")
+best_model, max_params = mpo.grid_search(evaluator=evaluator,
+                                        search_space=search_space,
+                                        fixed_args=fixed_args)
+# This will perform 3x3x3 = 27 trainings of all combinations of search_space params
+```
+
+
+

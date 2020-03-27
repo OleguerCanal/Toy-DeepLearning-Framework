@@ -7,7 +7,8 @@ import itertools as it
 # TODO(Oleguer): Think about the structure of all this
 
 class MetaParamOptimizer:
-    def __init__(self):
+    def __init__(self, save_path=""):
+        self.save_path = save_path  # Where to save best result and remaining to explore
         pass
 
     def grid_search(self, evaluator, search_space, fixed_args):
