@@ -8,20 +8,20 @@ This repo contains:
 
 ## MLP
 
-You can build, train and assess your (simple) Multi-Layer-Perceptron Squential architecture as you would do in Keras.
+Allows to Build, Train and Assess your fully modular Multi-Layer-Perceptron Squential architecture as you would do using Keras.
 The model now presents the following features:
 
 - **Layers:**
-    - Dense (Fully connected)
-    - Activation: Relu/SoftMax
-- **Lossess:**
+    - Trainable: Dense (Fully connected)
+    - Activation: Relu, SoftMax
+- **Losses:**
     - Cross-Entropy
     - SVM MultiClass
-- **Minibatch Gradient Descent BackProp Training** with customizable:
+- **Optimizer:** Minibatch Gradient Descent BackProp Training with customizable:
     - Learning Rate
     - Momentum
     - Regularization
-    - Train/Val Loss (& accuracy) tracking
+    - Train/Val Loss & accuracy tracking
 
 
 Code Example:
