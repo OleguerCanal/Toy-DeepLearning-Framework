@@ -26,13 +26,14 @@ if __name__ == "__main__":
 
     # Define model
     model = Sequential(loss="cross_entropy")
-    model.add(Dense(nodes=10, input_dim=x_train.shape[0]))
+    model.add(Dense(nodes=10, input_dim=x_train.shape[0], weight_initialization="fixed"))
     model.add(Activation("softmax"))
 
     # Fit model
     model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val,
-            batch_size=200, epochs=100, lr=0.0001, momentum=0.1, l2_reg=0.1)
+            batch_size=100, epochs=100, lr=0.001, momentum=0.1, l2_reg=0.1)
     model.plot_training_progress()
+    model.save("test_1")
 
     # Test model
     test_acc, test_loss = model.get_classification_metrics(x_test, y_test)

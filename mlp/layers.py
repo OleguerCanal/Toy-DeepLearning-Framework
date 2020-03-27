@@ -14,22 +14,6 @@ class Dense:
         self.__initialize_weights(weight_initialization)
         self.dw = np.zeros(self.weights.shape)  # Weight updates
 
-    def __initialize_weights(self, weight_initialization):
-        if weight_initialization == "fixed":
-            self.weights = np.matrix(np.random.normal(
-                0, 1./100.,
-                                    (self.nodes, self.input_shape+1)))  # Add biases
-        if weight_initialization == "in_dim":
-            self.weights = np.matrix(np.random.normal(
-                0, 1./float(self.input_shape),
-                (self.nodes, self.input_shape+1)))  # Add biases
-        if weight_initialization == "xavier":
-            limit = np.sqrt(6/(nodes+self.input_shape))
-            self.weights = np.matrix(np.random.uniform(
-                low=-limit,
-                high=limit,
-                size=(self.nodes, self.input_shape+1)))  # Add biases
-
     def forward(self, inputs):
         self.inputs = np.append(
             inputs, [np.ones(inputs.shape[1])], axis=0)  # Add biases
@@ -47,11 +31,26 @@ class Dense:
             regularization_weights  # Only current layer weights != 0
 
         # Weight update
-        n = self.inputs.shape[1]
         self.dw = momentum*self.dw + \
-            (1-momentum)*(in_gradient*self.inputs.T/n + regularization_term)
+            (1-momentum)*(in_gradient*self.inputs.T + regularization_term)
         self.weights -= lr*self.dw
         return left_layer_gradient
+
+    def __initialize_weights(self, weight_initialization):
+        if weight_initialization == "fixed":
+            self.weights = np.matrix(np.random.normal(
+                0, 1./100.,
+                                    (self.nodes, self.input_shape+1)))  # Add biases
+        if weight_initialization == "in_dim":
+            self.weights = np.matrix(np.random.normal(
+                0, 1./float(self.input_shape),
+                (self.nodes, self.input_shape+1)))  # Add biases
+        if weight_initialization == "xavier":
+            limit = np.sqrt(6/(self.nodes+self.input_shape))
+            self.weights = np.matrix(np.random.uniform(
+                low=-limit,
+                high=limit,
+                size=(self.nodes, self.input_shape+1)))  # Add biases
 
 
 class Activation:

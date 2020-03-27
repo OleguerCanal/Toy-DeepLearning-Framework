@@ -5,6 +5,7 @@ import math
 from matplotlib import pyplot as plt
 import copy
 from tqdm import tqdm
+import pickle
 
 import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
@@ -13,10 +14,13 @@ from utils import prob_to_class, accuracy
 from layers import Activation, Dense
 
 class Sequential:
-    def __init__(self, loss="cross_entropy", reg_term=0.1):
+    def __init__(self, loss="cross_entropy", reg_term=0.1, pre_saved=None):
         self.layers = []
         self.loss_type = loss
         self.reg_term = reg_term
+        if pre_saved is not None:
+            self.load(pre_saved)
+        print(self.layers)
 
     def add(self, layer):
         """Add layer"""
@@ -114,6 +118,18 @@ class Sequential:
         if show:
             plt.show()
 
+    def save(self, path):
+        """ Saves current model to disk (Dont put file extension)"""
+        with open(path + ".pkl", 'wb') as output:
+            pickle.dump(self.__dict__, output, pickle.HIGHEST_PROTOCOL)
+
+    def load(self, path):
+        """ Loads model to disk (Dont put file extension)"""
+        print("loading")
+        with open(path + ".pkl", 'rb') as input:
+            tmp_dict = pickle.load(input)
+            self.__dict__.update(tmp_dict)
+
     # LOSS FUNCTIONS ##############################################
     # TODO(Oleguer): Should all this be here?
     def __loss(self, Y_pred_prob, Y_real):
@@ -131,7 +147,7 @@ class Sequential:
         return None
 
     def __cross_entropy(self, Y_pred, Y_real):
-        return -np.sum(np.log(np.sum(np.multiply(Y_pred, Y_real), axis=0)))
+        return -np.sum(np.log(np.sum(np.multiply(Y_pred, Y_real), axis=0)))/float(Y_pred.shape[1])
 
     def __cross_entropy_diff(self, Y_pred, Y_real):
         # d(-log(x))/dx = -1/x
@@ -140,7 +156,7 @@ class Sequential:
         loss_diff = - \
             np.reciprocal(f_y, out=np.zeros_like(
                 Y_pred), where=abs(f_y) > 0.000001)
-        return loss_diff
+        return loss_diff/float(Y_pred.shape[1])
 
     def __categorical_hinge(self, Y_pred, Y_real):
         # L = SUM_data (SUM_dim_j(not yi) (MAX(0, y_pred_j - y_pred_yi + 1)))
@@ -148,7 +164,7 @@ class Sequential:
         neg = np.multiply(1-Y_real, Y_pred)  # Val of wrong results
         val = neg + 1 - pos
         val = np.multiply(val, (val > 0))
-        return np.sum(val)
+        return np.sum(val)/float(Y_pred.shape[1])
 
     def __categorical_hinge_diff(self, Y_pred, Y_real):
         # Forall j != yi: (y_pred_j - y_pred_yi + 1 > 0)
