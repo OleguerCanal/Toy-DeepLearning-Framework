@@ -8,8 +8,9 @@ from tqdm import tqdm
 
 import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
-from layers import Activation, Dense
+
 from utils import prob_to_class, accuracy
+from layers import Activation, Dense
 
 class Sequential:
     def __init__(self, loss="cross_entropy", reg_term=0.1):
@@ -51,24 +52,25 @@ class Sequential:
         # Training
         pbar = tqdm(list(range(epochs)))
         for epoch in pbar:
-            indx = list(range(X.shape[1])) 
+            indx = list(range(X.shape[1]))
             np.random.shuffle(indx)
-            for i in range(int(X.shape[1]/batch_size)):  # Missing last X.shape[1]%batch_size but should be ok
+            for i in range(int(X.shape[1]/batch_size)):
                 # Get minibatch
                 X_minibatch = X[:, indx[i:i+batch_size]]
                 Y_minibatch = Y[:, indx[i:i+batch_size]]
-                
+
                 # Forward pass
                 Y_pred_prob = self.predict(X_minibatch)
-
+                
                 # Backprop
-                gradient = self.__loss_diff(Y_pred_prob, Y_minibatch)  # First error id (D loss)/(D weight)
-                for layer in reversed(self.layers):  # Next errors given by each layer weights
+                gradient = self.__loss_diff(Y_pred_prob, Y_minibatch)
+                # Prev grad depends on each layer function
+                for layer in reversed(self.layers):
                     gradient = layer.backward(
-                                    in_gradient=gradient,
-                                    lr=lr,
-                                    momentum=momentum,
-                                    l2_regularization=l2_reg)
+                        in_gradient=gradient,
+                        lr=lr,  # Trainable layer parameters
+                        momentum=momentum,
+                        l2_regularization=l2_reg)
             # Error tracking:
             train_acc, train_loss = self.get_classification_metrics(X, Y)
             val_acc, val_loss = self.get_classification_metrics(X_val, Y_val)
@@ -82,7 +84,7 @@ class Sequential:
         fig, ax1 = plt.subplots()
         # Losses
         ax1.set_xlabel("Epoch")
-        ax1.set_ylabel("Losses")
+        ax1.set_ylabel("Loss")
         if len(self.val_losses) > 0:
             ax1.plot(list(range(len(self.val_losses))),
                      self.val_losses, label="Val loss", c="red")
@@ -90,10 +92,10 @@ class Sequential:
                  self.train_losses, label="Train loss", c="orange")
         ax1.tick_params(axis='y')
         plt.legend(loc='center right')
-        
+
         # Accuracies
         ax2 = ax1.twinx()
-        ax2.set_ylabel("Accuracies")
+        ax2.set_ylabel("Accuracy")
         n = len(self.train_accuracies)
         ax2.plot(list(range(n)),
                  np.array(self.train_accuracies), label="Train acc", c="green")
@@ -102,33 +104,58 @@ class Sequential:
             ax2.plot(list(range(n)),
                      np.array(self.val_accuracies), label="Val acc", c="blue")
         ax2.tick_params(axis='y')
-        
+
         # fig.tight_layout()
         plt.title("Training Evolution")
         plt.legend(loc='upper right')
-        
+
         if save:
             plt.savefig("figures/" + name + ".png")
         if show:
             plt.show()
 
     # LOSS FUNCTIONS ##############################################
-    # TODO(Oleguer): Should this be here?
+    # TODO(Oleguer): Should all this be here?
     def __loss(self, Y_pred_prob, Y_real):
         if self.loss_type == "cross_entropy":
             return self.__cross_entropy(Y_pred_prob, Y_real)
+        if self.loss_type == "categorical_hinge":
+            return self.__categorical_hinge(Y_pred_prob, Y_real)
         return None
 
     def __loss_diff(self, Y_pred, Y_real):
         if self.loss_type == "cross_entropy":
             return self.__cross_entropy_diff(Y_pred, Y_real)
+        if self.loss_type == "categorical_hinge":
+            return self.__categorical_hinge_diff(Y_pred, Y_real)
         return None
 
     def __cross_entropy(self, Y_pred, Y_real):
         return -np.sum(np.log(np.sum(np.multiply(Y_pred, Y_real), axis=0)))
-    
+
     def __cross_entropy_diff(self, Y_pred, Y_real):
-        # IDEA: d(-log(x))/dx = -1/x 
+        # d(-log(x))/dx = -1/x
         f_y = np.multiply(Y_real, Y_pred)
-        loss_diff = -np.reciprocal(f_y, out=np.zeros_like(Y_pred), where=abs(f_y)>0.000001)  # Element-wise inverse
+        # Element-wise inverse
+        loss_diff = - \
+            np.reciprocal(f_y, out=np.zeros_like(
+                Y_pred), where=abs(f_y) > 0.000001)
         return loss_diff
+
+    def __categorical_hinge(self, Y_pred, Y_real):
+        # L = SUM_data (SUM_dim_j(not yi) (MAX(0, y_pred_j - y_pred_yi + 1)))
+        pos = np.sum(np.multiply(Y_real, Y_pred), axis=0)  # Val of right result
+        neg = np.multiply(1-Y_real, Y_pred)  # Val of wrong results
+        val = neg + 1 - pos
+        val = np.multiply(val, (val > 0))
+        return np.sum(val)
+
+    def __categorical_hinge_diff(self, Y_pred, Y_real):
+        # Forall j != yi: (y_pred_j - y_pred_yi + 1 > 0)
+        # If     j == yi: -1 SUM_j(not yi) (y_pred_j - y_pred_yi + 1 > 0)
+        pos = np.sum(np.multiply(Y_real, Y_pred), axis=0)  # Val of right result
+        neg = np.multiply(1-Y_real, Y_pred)  # Val of wrong results
+        wrong_class_activations = np.multiply(1-Y_real, (neg + 1 - pos > 0))  # Val of wrong results
+        wca_sum = np.sum(wrong_class_activations, axis=0)
+        neg_wca = np.einsum("ij,j->ij", Y_real, np.array(wca_sum).flatten())
+        return wrong_class_activations - neg_wca
