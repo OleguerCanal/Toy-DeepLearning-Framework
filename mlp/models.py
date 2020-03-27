@@ -20,7 +20,6 @@ class Sequential:
         self.reg_term = reg_term
         if pre_saved is not None:
             self.load(pre_saved)
-        print(self.layers)
 
     def add(self, layer):
         """Add layer"""
@@ -114,7 +113,7 @@ class Sequential:
         plt.legend(loc='upper right')
 
         if save:
-            plt.savefig("figures/" + name + ".png")
+            plt.savefig(name + ".png")
         if show:
             plt.show()
 

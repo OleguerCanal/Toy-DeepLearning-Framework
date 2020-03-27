@@ -1,15 +1,15 @@
-# DeepLearning Framework PlayGround
+# Deep Learning Framework Playground
 
-Simple Keras-inspired DeepLearning Framework implemented in Python with Numpy backend.
+Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend.
 
 As all my other repos, this is more an exercise for me to make sure I understand the main Deep Learning architectures and algorithms, rather than useful code.
 Hope it also helps you understand them!
 
-This repo contains:
+# Architectures:
 
-## MLP
+## Multi Layer Perceptron (MLP)
 
-Allows to Build, Train and Assess your fully modular Multi-Layer-Perceptron Squential architecture as you would do using Keras.
+Allows to Build, Train and Assess a modular Multi-Layer-Perceptron Squential architecture as you would do using Keras.
 The model now presents the following features:
 
 - **Layers:**
@@ -46,3 +46,10 @@ model.plot_training_progress()
 test_acc, test_loss = model.get_metrics(x_test, y_test)
 print("Test accuracy:", test_acc)
 ```
+
+**NOTE:** More architectures and features (RBF, SOM, DBF) comming soon
+
+# Utilities
+
+## Meta-Parameter Optimization (MPO)
+
