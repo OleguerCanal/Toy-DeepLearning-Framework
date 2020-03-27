@@ -1,6 +1,6 @@
 # DeepLearning Framework PlayGround
 
-Simple Keras-inspired DeepLearning Framework Python implementation using Numpy backend.
+Simple Keras-inspired DeepLearning Framework implemented in Python with Numpy backend.
 As all my other repos, this is more an exercise for me to make sure I understand the main Deep Learning architectures and algorithms, rather than useful code.
 Hope it also helps you understand them!
 
@@ -18,9 +18,11 @@ The model now presents the following features:
     - Cross-Entropy
     - SVM MultiClass
 - **Optimizer:** Minibatch Gradient Descent BackProp Training with customizable:
+    - Batch Size
+    - Epochs
     - Learning Rate
     - Momentum
-    - Regularization
+    - L2 Regularization Term
     - Train/Val Loss & accuracy tracking
 
 

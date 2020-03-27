@@ -9,6 +9,9 @@ from mlp.utils import getXY, LoadBatch, prob_to_class
 np.random.seed(0)
 
 if __name__ == "__main__":
+    # Download & Extract CIFAR-10 Python (https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz)
+    # Put it in a Data folder
+
     # Load data
     x_train, y_train = getXY(LoadBatch("data_batch_1"))
     x_val, y_val = getXY(LoadBatch("data_batch_2"))
@@ -32,5 +35,5 @@ if __name__ == "__main__":
     model.plot_training_progress()
 
     # Test model
-    test_acc, test_loss = model.get_metrics(x_test, y_test)
+    test_acc, test_loss = model.get_classification_metrics(x_test, y_test)
     print("Test accuracy:", test_acc)
