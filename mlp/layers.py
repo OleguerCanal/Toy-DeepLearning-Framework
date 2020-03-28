@@ -22,7 +22,7 @@ class Dense:
     def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
         # Previous layer error propagation
         left_layer_gradient = (
-            self.weights.T*in_gradient)[:-1, :]  # Remove bias
+            self.weights.T*in_gradient)[:-1, :]  # Remove bias TODO Think about this
 
         # Regularization
         regularization_weights = copy.deepcopy(self.weights)
@@ -31,9 +31,12 @@ class Dense:
             regularization_weights  # Only current layer weights != 0
 
         # Weight update
-        self.dw = momentum*self.dw + \
-            (1-momentum)*(in_gradient*self.inputs.T + regularization_term)
+        self.gradient = in_gradient*self.inputs.T + regularization_term #TODO: Rremove self if not going to update it
+        self.dw = momentum*self.dw + (1-momentum)*self.gradient
         self.weights -= lr*self.dw
+        # print(np.average(np.abs(self.dw)))
+        # print(np.average(np.abs(self.dw[:, -1])))
+        # print("#####")
         return left_layer_gradient
 
     def __initialize_weights(self, weight_initialization):
@@ -56,7 +59,7 @@ class Dense:
 class Activation:
     def __init__(self, activation="softmax"):
         self.activation_type = activation
-        self.weights = 0
+        self.weights = None
 
     def forward(self, inputs):
         self.inputs = inputs

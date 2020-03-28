@@ -14,10 +14,9 @@ from utils import prob_to_class, accuracy
 from layers import Activation, Dense
 
 class Sequential:
-    def __init__(self, loss="cross_entropy", reg_term=0.1, pre_saved=None):
+    def __init__(self, loss="cross_entropy", pre_saved=None):
         self.layers = []
         self.loss_type = loss
-        self.reg_term = reg_term
         if pre_saved is not None:
             self.load(pre_saved)
 
@@ -52,6 +51,14 @@ class Sequential:
         self.train_accuracies = []
         self.val_accuracies = []
 
+        # Error tracking:
+        train_acc, train_loss = self.get_classification_metrics(X, Y)
+        val_acc, val_loss = self.get_classification_metrics(X_val, Y_val)
+        self.train_accuracies.append(train_acc)
+        self.val_accuracies.append(val_acc)
+        self.train_losses.append(train_loss)
+        self.val_losses.append(val_loss)
+
         # Training
         pbar = tqdm(list(range(epochs)))
         for epoch in pbar:
@@ -61,7 +68,10 @@ class Sequential:
                 # Get minibatch
                 X_minibatch = X[:, indx[i:i+batch_size]]
                 Y_minibatch = Y[:, indx[i:i+batch_size]]
-
+                if i == int(X.shape[1]/batch_size) - 1:  # Get all the remaining
+                    X_minibatch = X[:, indx[i:]]
+                    Y_minibatch = Y[:, indx[i:]]
+                    
                 # Forward pass
                 Y_pred_prob = self.predict(X_minibatch)
                 
@@ -83,13 +93,13 @@ class Sequential:
             self.val_losses.append(val_loss)
             pbar.set_description("Val acc: " + str(val_acc))
 
-    def plot_training_progress(self, show=True, save=False, name="model_results"):
+    def plot_training_progress(self, show=True, save=False, name="model_results", subtitle=None):
         fig, ax1 = plt.subplots()
         # Losses
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
-        # ax1.set_ylim(bottom=0)
-        # ax1.set_ylim(top=2*np.amax(self.val_losses))
+        ax1.set_ylim(bottom=np.amin(self.val_losses)/2)
+        ax1.set_ylim(top=1.25*np.amax(self.val_losses))
         if len(self.val_losses) > 0:
             ax1.plot(list(range(len(self.val_losses))),
                      self.val_losses, label="Val loss", c="red")
@@ -102,7 +112,7 @@ class Sequential:
         ax2 = ax1.twinx()
         ax2.set_ylabel("Accuracy")
         ax2.set_ylim(bottom=0)
-        ax2.set_ylim(top=1)
+        ax2.set_ylim(top=0.5)
         n = len(self.train_accuracies)
         ax2.plot(list(range(n)),
                  np.array(self.train_accuracies), label="Train acc", c="green")
@@ -112,8 +122,10 @@ class Sequential:
                      np.array(self.val_accuracies), label="Val acc", c="blue")
         ax2.tick_params(axis='y')
 
-        # fig.tight_layout()
-        plt.title("Training Evolution")
+        # plt.tight_layout()
+        plt.suptitle("Training Evolution")
+        if subtitle is not None:
+            plt.title(subtitle)
         plt.legend(loc='upper right')
 
         if save:
@@ -122,6 +134,22 @@ class Sequential:
             plt.savefig(name + ".png")
         if show:
             plt.show()
+
+    def cost(self, Y_pred_prob, Y_real, l2_reg):
+        """Computes cost = loss + regularization"""
+        # Loss
+        loss = 0
+        if self.loss_type == "cross_entropy":
+            loss = self.__cross_entropy(Y_pred_prob, Y_real)
+
+        # Regularization
+        w_norm = 0
+        for layer in self.layers:
+            if layer.weights is not None:
+                w_norm += np.linalg.norm(layer.weights, 'fro')**2
+
+        return loss + l2_reg*w_norm
+
 
     def save(self, path):
         """ Saves current model to disk (Dont put file extension)"""
