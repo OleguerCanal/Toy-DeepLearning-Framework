@@ -34,7 +34,8 @@ class Dense:
         self.dw = momentum*self.dw + \
             (1-momentum)*(in_gradient*self.inputs.T + regularization_term)
         self.weights -= lr*self.dw
-        return left_layer_gradient
+        # return left_layer_gradient
+        return in_gradient*self.inputs.T + regularization_term  # TODO(oelguer) CHANGE THIS BACK!!!!
 
     def __initialize_weights(self, weight_initialization):
         if weight_initialization == "fixed":
@@ -56,7 +57,7 @@ class Dense:
 class Activation:
     def __init__(self, activation="softmax"):
         self.activation_type = activation
-        self.weights = 0
+        self.weights = None
 
     def forward(self, inputs):
         self.inputs = inputs

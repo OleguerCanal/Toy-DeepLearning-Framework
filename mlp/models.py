@@ -83,6 +83,23 @@ class Sequential:
             self.val_losses.append(val_loss)
             pbar.set_description("Val acc: " + str(val_acc))
 
+            return gradient
+
+    def cost(self, Y_pred_prob, Y_real):
+        """Computes cost = loss + regularization"""
+        # Loss
+        loss = 0
+        if self.loss_type == "cross_entropy":
+            loss = self.__cross_entropy(Y_pred_prob, Y_real)
+
+        # Regularization
+        w_norm = 0
+        for layer in self.layers:
+            if layer.weights is not None:
+                w_norm += np.linalg.norm(layer.weights, 'fro')**2
+
+        return loss + self.reg_term*w_norm
+
     def plot_training_progress(self, show=True, save=False, name="model_results"):
         fig, ax1 = plt.subplots()
         # Losses
