@@ -88,6 +88,8 @@ class Sequential:
         # Losses
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
+        # ax1.set_ylim(bottom=0)
+        # ax1.set_ylim(top=2*np.amax(self.val_losses))
         if len(self.val_losses) > 0:
             ax1.plot(list(range(len(self.val_losses))),
                      self.val_losses, label="Val loss", c="red")
@@ -99,6 +101,8 @@ class Sequential:
         # Accuracies
         ax2 = ax1.twinx()
         ax2.set_ylabel("Accuracy")
+        ax2.set_ylim(bottom=0)
+        ax2.set_ylim(top=1)
         n = len(self.train_accuracies)
         ax2.plot(list(range(n)),
                  np.array(self.train_accuracies), label="Train acc", c="green")

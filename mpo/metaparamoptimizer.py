@@ -20,7 +20,7 @@ class MetaParamOptimizer:
         """
         max_result = None
         for indx, evaluable_args in enumerate(dicts_list):
-            print("GridSearch evaluating:", indx, "/", len(dicts_list), ":", evaluable_args)
+            print("MetaParamOptimizer evaluating:", indx, "/", len(dicts_list), ":", evaluable_args)
             args = {**evaluable_args, **fixed_args}  # Merge kwargs and evaluable_args dicts
             try:
                 result = evaluator(**args)

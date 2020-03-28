@@ -61,7 +61,7 @@ if __name__ == "__main__":
         "y_val" : y_val,
         "batch_size": 100,
         "epochs" : 40,
-        "momentum" : 0.0,
+        "momentum" : 0.7,
     }
     # NOTE: The union of both dictionaries should contain all evaluator parameters
 

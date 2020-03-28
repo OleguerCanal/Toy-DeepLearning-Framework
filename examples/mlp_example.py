@@ -31,9 +31,9 @@ if __name__ == "__main__":
 
     # Fit model
     model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val,
-            batch_size=100, epochs=100, lr=0.001, momentum=0.1, l2_reg=0.1)
+            batch_size=100, epochs=40, lr=0.001, momentum=0.7, l2_reg=0.1)
     model.plot_training_progress()
-    model.save("test_1")
+    model.save("models/mlp_test")
 
     # Test model
     test_acc, test_loss = model.get_classification_metrics(x_test, y_test)
