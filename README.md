@@ -53,7 +53,7 @@ print("Test accuracy:", test_acc)
 
 ## Meta-Parameter Optimization (MPO)
 
-Metaparameter Optimization is commonly used when training these kind of models. To ease the process I implemented a MetaParamOptimizer class with functions such as Grid Search (working on Gaussian Process Regression Optimization [here](https://github.com/fedetask/hyperparameter-optimization)):
+Metaparameter Optimization is commonly used when training these kind of models. To ease the process I implemented a MetaParamOptimizer class with methods such as Grid Search (working on Gaussian Process Regression Optimization [here](https://github.com/fedetask/hyperparameter-optimization)):
 
 1. Define the **search space** and **fixed args** and a of your model in two diferent dictionaries
 2. Define an **evaluator** function which trains and evaluates your model in joined arguments, this function should return a ``dictionary`` with at least the key **"value"** (which MetaParamOptimizer will optimize).
@@ -63,10 +63,10 @@ Code example:
 from mpo.metaparamoptimizer import MetaParamOptimizer
 from util.misc import dict_to_string
 
-search_space = {  # Optimization will be performef over these params
-    "batch_size": [100, 200, 400],
-    "lr": [0.001, 0.01, 0.1],
-    "l2_reg": [0.01, 0.1]
+search_space = {  # Optimization will be performed on all combinations of these
+    "batch_size": [100, 200, 400],     # Batch sizes
+    "lr": [0.001, 0.01, 0.1],          # Learning rates
+    "l2_reg": [0.01, 0.1]              # L2 Regularization terms
 }
 fixed_args = {  # These will be kept constant
     "x_train" : x_train,
@@ -98,7 +98,7 @@ mpo = MetaParamOptimizer(save_path="models/")
 best_model = mpo.grid_search(evaluator=evaluator,
                             search_space=search_space,
                             fixed_args=fixed_args)
-# This will perform 3x3x3 = 27 trainings of all combinations of search_space params
+# This will run your evaluator function 3x3x3 = 27 times on all combinations of search_space params
 ```
 
 
