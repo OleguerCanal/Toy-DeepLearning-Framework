@@ -7,11 +7,12 @@ import copy
 from tqdm import tqdm
 import pickle
 
-import sys, pathlib
+import sys
+import pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
 
-from utils import prob_to_class, accuracy
 from layers import Activation, Dense
+from utils import prob_to_class, accuracy, minibatch_split
 
 class Sequential:
     def __init__(self, loss="cross_entropy", pre_saved=None):
@@ -41,58 +42,41 @@ class Sequential:
         loss = self.__loss(Y_pred_prob, Y_real)
         return acc, loss
 
-    def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=100, lr=0.01, momentum=0.7, l2_reg=0.1):
-        if (batch_size is None) or (batch_size > X.shape[1]):
-            batch_size = X.shape[1]
-
-        # Learning tracking
-        self.train_losses = []
-        self.val_losses = []
-        self.train_accuracies = []
-        self.val_accuracies = []
-
-        # Error tracking:
-        train_acc, train_loss = self.get_classification_metrics(X, Y)
-        val_acc, val_loss = self.get_classification_metrics(X_val, Y_val)
-        self.train_accuracies.append(train_acc)
-        self.val_accuracies.append(val_acc)
-        self.train_losses.append(train_loss)
-        self.val_losses.append(val_loss)
-
+    def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=100, lr=0.01, momentum=0.7, l2_reg=0.1, save_path=None):
+        """ Performs backrpop with given parameters.
+            save_path is where model of best val accuracy will be saved
+        """
+        # Restart tracking the learning
+        best_model = None
+        max_val_acc = self.__track_training(X, Y, X_val, Y_val, restart=True)
         # Training
         pbar = tqdm(list(range(epochs)))
         for epoch in pbar:
-            indx = list(range(X.shape[1]))
-            np.random.shuffle(indx)
-            for i in range(int(X.shape[1]/batch_size)):
-                # Get minibatch
-                X_minibatch = X[:, indx[i:i+batch_size]]
-                Y_minibatch = Y[:, indx[i:i+batch_size]]
-                if i == int(X.shape[1]/batch_size) - 1:  # Get all the remaining
-                    X_minibatch = X[:, indx[i:]]
-                    Y_minibatch = Y[:, indx[i:]]
-                    
-                # Forward pass
-                Y_pred_prob = self.predict(X_minibatch)
-                
-                # Backprop
-                gradient = self.__loss_diff(Y_pred_prob, Y_minibatch)
-                # Prev grad depends on each layer function
-                for layer in reversed(self.layers):
+            for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size):
+                Y_pred_prob = self.predict(X_minibatch)  # Forward pass
+                gradient = self.__loss_diff(Y_pred_prob, Y_minibatch)  # Loss grad
+                for layer in reversed(self.layers):  # Backprop (chain rule)
                     gradient = layer.backward(
                         in_gradient=gradient,
                         lr=lr,  # Trainable layer parameters
                         momentum=momentum,
                         l2_regularization=l2_reg)
-            # Error tracking:
-            train_acc, train_loss = self.get_classification_metrics(X, Y)
-            val_acc, val_loss = self.get_classification_metrics(X_val, Y_val)
-            self.train_accuracies.append(train_acc)
-            self.val_accuracies.append(val_acc)
-            self.train_losses.append(train_loss)
-            self.val_losses.append(val_loss)
+            # TODO(Oleguer): ALL THOSE SHOULD BE CALLBACKS PASSED BY USER!!!
+            val_acc = self.__track_training(X, Y, X_val, Y_val)  # Update tracking
+            if save_path is not None and val_acc > max_val_acc:  # Save model if improved val_Acc
+                max_val_acc = val_acc
+                self.save(save_path)
+                best_model = copy.deepcopy(self)  # TODO(oleguer): Probably there is a decent way of doing this
             pbar.set_description("Val acc: " + str(val_acc))
+            lr = 0.9*lr  # Weight decay TODO(oleguer): Do this in a scheduler
 
+        # Set latest tracking TODO(oleguer) Use a dictionary or something!!
+        best_model.train_accuracies = self.train_accuracies
+        best_model.val_accuracies = self.val_accuracies
+        best_model.train_losses = self.train_losses
+        best_model.val_losses = self.val_losses
+        return best_model
+    
     def plot_training_progress(self, show=True, save=False, name="model_results", subtitle=None):
         fig, ax1 = plt.subplots()
         # Losses
@@ -150,7 +134,7 @@ class Sequential:
 
         return loss + l2_reg*w_norm
 
-
+    # IO functions ################################################
     def save(self, path):
         """ Saves current model to disk (Dont put file extension)"""
         directory = "/".join(path.split("/")[:-1])
@@ -164,8 +148,25 @@ class Sequential:
             tmp_dict = pickle.load(input)
             self.__dict__.update(tmp_dict)
 
+    # Private methods
+    def __track_training(self, X, Y, X_val=None, Y_val=None, restart=False):
+        if restart:
+            self.train_accuracies = []
+            self.val_accuracies = []
+            self.train_losses = []
+            self.val_losses = []
+        # TODO(oleguer): Allow for other metrics
+        train_acc, train_loss = self.get_classification_metrics(X, Y)
+        val_acc, val_loss = self.get_classification_metrics(X_val, Y_val)
+        self.train_accuracies.append(train_acc)
+        self.val_accuracies.append(val_acc)
+        self.train_losses.append(train_loss)
+        self.val_losses.append(val_loss)
+        return val_acc
+
     # LOSS FUNCTIONS ##############################################
     # TODO(Oleguer): Should all this be here?
+
     def __loss(self, Y_pred_prob, Y_real):
         if self.loss_type == "cross_entropy":
             return self.__cross_entropy(Y_pred_prob, Y_real)
@@ -194,7 +195,8 @@ class Sequential:
 
     def __categorical_hinge(self, Y_pred, Y_real):
         # L = SUM_data (SUM_dim_j(not yi) (MAX(0, y_pred_j - y_pred_yi + 1)))
-        pos = np.sum(np.multiply(Y_real, Y_pred), axis=0)  # Val of right result
+        pos = np.sum(np.multiply(Y_real, Y_pred),
+                     axis=0)  # Val of right result
         neg = np.multiply(1-Y_real, Y_pred)  # Val of wrong results
         val = neg + 1 - pos
         val = np.multiply(val, (val > 0))
@@ -203,9 +205,11 @@ class Sequential:
     def __categorical_hinge_diff(self, Y_pred, Y_real):
         # Forall j != yi: (y_pred_j - y_pred_yi + 1 > 0)
         # If     j == yi: -1 SUM_j(not yi) (y_pred_j - y_pred_yi + 1 > 0)
-        pos = np.sum(np.multiply(Y_real, Y_pred), axis=0)  # Val of right result
+        pos = np.sum(np.multiply(Y_real, Y_pred),
+                     axis=0)  # Val of right result
         neg = np.multiply(1-Y_real, Y_pred)  # Val of wrong results
-        wrong_class_activations = np.multiply(1-Y_real, (neg + 1 - pos > 0))  # Val of wrong results
+        wrong_class_activations = np.multiply(
+            1-Y_real, (neg + 1 - pos > 0))  # Val of wrong results
         wca_sum = np.sum(wrong_class_activations, axis=0)
         neg_wca = np.einsum("ij,j->ij", Y_real, np.array(wca_sum).flatten())
         return wrong_class_activations - neg_wca

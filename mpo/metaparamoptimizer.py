@@ -32,7 +32,7 @@ class MetaParamOptimizer:
             if (max_result is None) or (result["value"] > max_result["value"]):
                 max_result = result
                 max_result["best_params"] = evaluable_args
-                self.save(max_result, name="best_result")  # save best result found so far
+                self.save(max_result, name="metaparam_search_best_result")  # save best result found so far
             # Save remaning tests (in case something goes wrong, know where to keep testing)
             self.save(dicts_list[indx+1:], name="remaining_tests")
         return max_result
