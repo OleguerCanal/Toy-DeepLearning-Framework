@@ -116,6 +116,7 @@ class Sequential:
             directory = "/".join(name.split("/")[:-1])
             pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
             plt.savefig(name + ".png")
+            plt.close()
         if show:
             plt.show()
 
@@ -125,6 +126,8 @@ class Sequential:
         loss = 0
         if self.loss_type == "cross_entropy":
             loss = self.__cross_entropy(Y_pred_prob, Y_real)
+        elif self.loss_type == "categorical_hinge":
+            loss = self.__categorical_hinge(Y_pred_prob, Y_real)
 
         # Regularization
         w_norm = 0
@@ -185,31 +188,29 @@ class Sequential:
         return -np.sum(np.log(np.sum(np.multiply(Y_pred, Y_real), axis=0)))/float(Y_pred.shape[1])
 
     def __cross_entropy_diff(self, Y_pred, Y_real):
+        _EPS = 1e-5
         # d(-log(x))/dx = -1/x
         f_y = np.multiply(Y_real, Y_pred)
         # Element-wise inverse
         loss_diff = - \
             np.reciprocal(f_y, out=np.zeros_like(
-                Y_pred), where=abs(f_y) > 0.000001)
+                Y_pred), where=abs(f_y) > _EPS)
         return loss_diff/float(Y_pred.shape[1])
 
     def __categorical_hinge(self, Y_pred, Y_real):
         # L = SUM_data (SUM_dim_j(not yi) (MAX(0, y_pred_j - y_pred_yi + 1)))
-        pos = np.sum(np.multiply(Y_real, Y_pred),
-                     axis=0)  # Val of right result
+        pos = np.sum(np.multiply(Y_real, Y_pred), axis=0)  # Val of right result
         neg = np.multiply(1-Y_real, Y_pred)  # Val of wrong results
-        val = neg + 1 - pos
+        val = neg + 1. - pos
         val = np.multiply(val, (val > 0))
         return np.sum(val)/float(Y_pred.shape[1])
 
     def __categorical_hinge_diff(self, Y_pred, Y_real):
         # Forall j != yi: (y_pred_j - y_pred_yi + 1 > 0)
         # If     j == yi: -1 SUM_j(not yi) (y_pred_j - y_pred_yi + 1 > 0)
-        pos = np.sum(np.multiply(Y_real, Y_pred),
-                     axis=0)  # Val of right result
+        pos = np.sum(np.multiply(Y_real, Y_pred), axis=0)  # Val of right result
         neg = np.multiply(1-Y_real, Y_pred)  # Val of wrong results
-        wrong_class_activations = np.multiply(
-            1-Y_real, (neg + 1 - pos > 0))  # Val of wrong results
+        wrong_class_activations = np.multiply(1-Y_real > 0.5, (neg + 1. - pos > 0))  # Val of wrong results
         wca_sum = np.sum(wrong_class_activations, axis=0)
         neg_wca = np.einsum("ij,j->ij", Y_real, np.array(wca_sum).flatten())
         return wrong_class_activations - neg_wca
