@@ -70,7 +70,7 @@ class Sequential:
             pbar.set_description("Val acc: " + str(val_acc))
             lr = 0.9*lr  # Weight decay TODO(oleguer): Do this in a scheduler
 
-        # Set latest tracking TODO(oleguer) Use a dictionary or something!!
+        # # Set latest tracking TODO(oleguer) Use a dictionary or something!!
         best_model.train_accuracies = self.train_accuracies
         best_model.val_accuracies = self.val_accuracies
         best_model.train_losses = self.train_losses
@@ -210,7 +210,10 @@ class Sequential:
         # If     j == yi: -1 SUM_j(not yi) (y_pred_j - y_pred_yi + 1 > 0)
         pos = np.sum(np.multiply(Y_real, Y_pred), axis=0)  # Val of right result
         neg = np.multiply(1-Y_real, Y_pred)  # Val of wrong results
-        wrong_class_activations = np.multiply(1-Y_real > 0.5, (neg + 1. - pos > 0))  # Val of wrong results
+        # print((neg + 1. - pos > 0))
+        # print(1-Y_real)
+        wrong_class_activations = np.multiply(1-Y_real, (neg + 1. - pos > 0))  # Val of wrong results
         wca_sum = np.sum(wrong_class_activations, axis=0)
+        # print(wca_sum)
         neg_wca = np.einsum("ij,j->ij", Y_real, np.array(wca_sum).flatten())
-        return wrong_class_activations - neg_wca
+        return (wrong_class_activations - neg_wca)/float(Y_pred.shape[1])
