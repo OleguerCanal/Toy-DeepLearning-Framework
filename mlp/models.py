@@ -53,7 +53,6 @@ class Sequential:
         # Restart tracking the learning
         best_model = None
         max_val_acc = self.__track_training(X, Y, X_val, Y_val, restart=True)
-        print(max_val_acc)
         # Training
         pbar = tqdm(list(range(epochs)))
         for epoch in pbar:
