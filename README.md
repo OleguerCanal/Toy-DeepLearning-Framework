@@ -10,14 +10,14 @@ Hope it also helps you understand them!
 ## Multi Layer Perceptron (MLP)
 
 Allows to Build, Train and Assess a modular Multi-Layer-Perceptron Squential architecture as you would do using Keras.
-The model now presents the following features:
+The model (as for now) presents the following features:
 
 - **Layers:**
-    - Trainable: Dense (Fully connected)
-    - Activation: Relu, SoftMax
+    - Trainable: Dense
+    - Activation: Relu, Softmax
 - **Losses:**
-    - Cross-Entropy Loss
-    - Categorical Hinge Loss (SVM MultiClass)
+    - CrossEntropy
+    - CategoricalHinge
 - **Optimizer:** Minibatch Gradient Descent BackProp Training with customizable:
     - Batch Size
     - Epochs

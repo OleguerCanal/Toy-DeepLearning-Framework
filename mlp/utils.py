@@ -17,6 +17,9 @@ def getXY(dataset, num_classes=10):
 	one_hot_labels[np.arange(labels.size), labels] = 1
 	return np.mat(dataset[b"data"]).T, np.mat(one_hot_labels).T
 
+def LoadXY(filename):
+	return getXY(LoadBatch(filename))
+
 def plot(flatted_image, shape=(32, 32, 3), order='F'):
 	image = np.reshape(flatted_image, shape, order=order)
 	cv2.imshow("image", image)
@@ -32,17 +35,19 @@ def prob_to_class(Y_pred_prob):
 def accuracy(Y_pred_classes, Y_real):
 	return np.sum(np.multiply(Y_pred_classes, Y_real))/Y_pred_classes.shape[1]
 
-def minibatch_split(X, Y, batch_size):
+def minibatch_split(X, Y, batch_size, shuffle=True):
 	"""Yields splited X, Y matrices in minibatches of given batch_size"""
 	if (batch_size is None) or (batch_size > X.shape[1]):
 		batch_size = X.shape[1]
 	indx = list(range(X.shape[1]))
-	np.random.shuffle(indx)
+	if shuffle:
+		np.random.shuffle(indx)
 	for i in range(int(X.shape[1]/batch_size)):
+		pos = i*batch_size
 		# Get minibatch
-		X_minibatch = X[:, indx[i:i+batch_size]]
-		Y_minibatch = Y[:, indx[i:i+batch_size]]
+		X_minibatch = X[:, indx[pos:pos+batch_size]]
+		Y_minibatch = Y[:, indx[pos:pos+batch_size]]
 		if i == int(X.shape[1]/batch_size) - 1:  # Get all the remaining
-			X_minibatch = X[:, indx[i:]]
-			Y_minibatch = Y[:, indx[i:]]
+			X_minibatch = X[:, indx[pos:]]
+			Y_minibatch = Y[:, indx[pos:]]
 		yield X_minibatch, Y_minibatch
