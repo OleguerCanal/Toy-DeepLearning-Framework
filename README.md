@@ -29,13 +29,16 @@ The model (as for now) presents the following features:
 
 Code Example:
 ```python
-from mlp.layers import Activation, Dense
+from mlp.layers import Dense, Relu, Softmax
 from mlp.models import Sequential
 
 # Define model
-model = Sequential(loss="cross_entropy")
-model.add(Dense(nodes=10, input_dim=x_train.shape[0]))
-model.add(Activation("softmax"))
+model = Sequential(loss=CrossEntropy())
+model.add(Dense(nodes=512, input_dim=x_train.shape[0]))
+model.add(Relu())
+model.add(Dense(nodes=10, input_dim=512))
+model.add(Softmax())
+
 
 # Fit model
 model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val,
@@ -79,9 +82,9 @@ fixed_args = {  # These will be kept constant
 
 def evaluator(x_train, y_train, x_val, y_val, **kwargs):
     # Define model
-    model = Sequential(loss="cross_entropy")
+    model = Sequential(loss=CrossEntropy())
     model.add(Dense(nodes=10, input_dim=x_train.shape[0]))
-    model.add(Activation("softmax"))
+    model.add(Softmax())
 
     # Fit model
     model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val, **kwargs)
