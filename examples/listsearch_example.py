@@ -34,9 +34,9 @@ if __name__ == "__main__":
     # Put it in a Data folder
 
     # Load data
-    x_train, y_train = getXY(LoadBatch("data_batch_1"))
-    x_val, y_val = getXY(LoadBatch("data_batch_2"))
-    x_test, y_test = getXY(LoadBatch("test_batch"))
+    x_train, y_train = LoadXY("data_batch_1")
+    x_val, y_val = LoadXY("data_batch_2")
+    x_test, y_test = LoadXY("test_batch")
 
     # Preprocessing
     mean_x = np.mean(x_train)
