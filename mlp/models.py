@@ -1,8 +1,8 @@
+from utils import minibatch_split
 import numpy as np
 import matplotlib
 import time
 import math
-from matplotlib import pyplot as plt
 import copy
 from tqdm import tqdm
 import pickle
@@ -11,15 +11,16 @@ import sys
 import pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
 
-from utils import prob_to_class, minibatch_split
-from metrics import accuracy
+# from callbacks import Callback, LearningRateScheduler
+
 
 class Sequential:
-    def __init__(self, loss=None, pre_trained=None):
+    def __init__(self, loss=None, pre_trained=None, metric=None):
         self.layers = []
 
         assert(loss is not None)  # You need a loss!!!
-        self.__loss = loss
+        self.loss = loss
+        self.metric = metric
 
         if pre_trained is not None:
             self.load(pre_trained)
@@ -31,117 +32,74 @@ class Sequential:
     def predict(self, X):
         """Forward pass"""
         vals = X
-        for layer in self.layers:
+        for layer in self.layers:   
             vals = layer(vals)
         return vals
 
-    def get_classification_metrics(self, X, Y_real):
+    def get_metric_loss(self, X, Y_real):
         """ Returns loss and classification accuracy """
         if X is None or Y_real is None:
-            return 1, 0
+            print("problem")
+            return 0, np.inf
         Y_pred_prob = self.predict(X)
-        Y_pred_classes = prob_to_class(Y_pred_prob)
-        acc = accuracy(Y_pred_classes, Y_real)
-        loss = self.__loss(Y_pred_prob, Y_real)
-        return acc, loss
-
-    def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=100,
-            lr=0.01, momentum=0.7, l2_reg=0.1, shuffle_minibatch=True, save_path=None):
-        """ Performs backrpop with given parameters.
-            save_path is where model of best val accuracy will be saved
-        """
-        # Restart tracking the learning
-        best_model = None
-        max_val_acc = self.__track_training(X, Y, X_val, Y_val, restart=True)
-        # Training
-        pbar = tqdm(list(range(epochs)))
-        for epoch in pbar:
-            for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch):
-                Y_pred_prob = self.predict(X_minibatch)  # Forward pass
-                gradient = self.__loss.backward(Y_pred_prob, Y_minibatch)  # Loss grad
-                for layer in reversed(self.layers):  # Backprop (chain rule)
-                    gradient = layer.backward(
-                                            in_gradient=gradient,
-                                            lr=lr,  # Trainable layer parameters
-                                            momentum=momentum,
-                                            l2_regularization=l2_reg)
-            # TODO(Oleguer): ALL THOSE SHOULD BE CALLBACKS PASSED BY USER!!!
-            val_acc = self.__track_training(X, Y, X_val, Y_val)  # Update tracking
-            if val_acc > max_val_acc:  # Save model if improved val_Acc
-                max_val_acc = val_acc
-                best_model = copy.deepcopy(self)  # TODO(oleguer): Probably there is a decent way of doing this
-                if save_path is not None:
-                    self.save(save_path)
-            pbar.set_description("Val acc: " + str(val_acc))
-            lr = 0.9*lr  # Weight decay TODO(oleguer): Do this in a scheduler
-
-        # # Set latest tracking TODO(oleguer) Use a dictionary or something!!
-        # if best_model is not None:
-        best_model.train_accuracies = self.train_accuracies
-        best_model.val_accuracies = self.val_accuracies
-        best_model.train_losses = self.train_losses
-        best_model.val_losses = self.val_losses
-        return best_model
-    
-    def plot_training_progress(self, show=True, save=False, name="model_results", subtitle=None):
-        fig, ax1 = plt.subplots()
-        # Losses
-        ax1.set_xlabel("Epoch")
-        ax1.set_ylabel("Loss")
-        ax1.set_ylim(bottom=np.amin(self.val_losses)/2)
-        ax1.set_ylim(top=1.25*np.amax(self.val_losses))
-        if len(self.val_losses) > 0:
-            ax1.plot(list(range(len(self.val_losses))),
-                     self.val_losses, label="Val loss", c="red")
-        ax1.plot(list(range(len(self.train_losses))),
-                 self.train_losses, label="Train loss", c="orange")
-        ax1.tick_params(axis='y')
-        plt.legend(loc='center right')
-
-        # Accuracies
-        ax2 = ax1.twinx()
-        ax2.set_ylabel("Accuracy")
-        ax2.set_ylim(bottom=0)
-        ax2.set_ylim(top=0.5)
-        n = len(self.train_accuracies)
-        ax2.plot(list(range(n)),
-                 np.array(self.train_accuracies), label="Train acc", c="green")
-        if len(self.val_accuracies) > 0:
-            n = len(self.val_accuracies)
-            ax2.plot(list(range(n)),
-                     np.array(self.val_accuracies), label="Val acc", c="blue")
-        ax2.tick_params(axis='y')
-
-        # plt.tight_layout()
-        plt.suptitle("Training Evolution")
-        if subtitle is not None:
-            plt.title(subtitle)
-        plt.legend(loc='upper right')
-
-        if save:
-            directory = "/".join(name.split("/")[:-1])
-            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
-            plt.savefig(name + ".png")
-            plt.close()
-        if show:
-            plt.show()
+        metric_val = 0
+        if self.metric is not None:
+            metric_val = self.metric(Y_pred_prob, Y_real)
+        loss = self.loss(Y_pred_prob, Y_real)
+        return metric_val, loss
 
     def cost(self, Y_pred_prob, Y_real, l2_reg):
         """Computes cost = loss + regularization"""
         # Loss
-        loss = 0
-        if self.loss_type == "cross_entropy":
-            loss = self.__cross_entropy(Y_pred_prob, Y_real)
-        elif self.loss_type == "categorical_hinge":
-            loss = self.__categorical_hinge(Y_pred_prob, Y_real)
-
+        loss_val = self.loss(Y_pred_prob, Y_real)
         # Regularization
         w_norm = 0
         for layer in self.layers:
             if layer.weights is not None:
                 w_norm += np.linalg.norm(layer.weights, 'fro')**2
+        return loss_val + l2_reg*w_norm
 
-        return loss + l2_reg*w_norm
+    def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=100,
+            lr=0.01, momentum=0.7, l2_reg=0.1, shuffle_minibatch=True,
+            callbacks=[]):
+        """ Performs backrpop with given parameters.
+            save_path is where model of best val accuracy will be saved
+        """
+        # Store vars as class variables so they can be accessed by callbacks
+        # TODO(think a better way)
+        self.X = X
+        self.Y = Y
+        self.X_val = X_val
+        self.Y_val = Y_val
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.lr = lr
+        self.momentum = momentum
+        self.l2_reg = l2_reg
+        self.val_metric = 0
+
+        # Call callbacks
+        for callback in callbacks:
+            callback.on_training_begin(self)
+
+        # Training
+        pbar = tqdm(list(range(self.epochs)))
+        for self.epoch in pbar:
+            for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch):
+                Y_pred_prob = self.predict(X_minibatch)  # Forward pass
+                gradient = self.loss.backward(
+                    Y_pred_prob, Y_minibatch)  # Loss grad
+                for layer in reversed(self.layers):  # Backprop (chain rule)
+                    gradient = layer.backward(
+                        in_gradient=gradient,
+                        lr=self.lr,  # Trainable layer parameters
+                        momentum=self.momentum,
+                        l2_regularization=self.l2_reg)
+
+            # Call callbacks
+            for callback in callbacks:
+                callback.on_epoch_end(self)
+            pbar.set_description("Val acc: " + str(self.val_metric))
 
     # IO functions ################################################
     def save(self, path):
@@ -156,19 +114,3 @@ class Sequential:
         with open(path + ".pkl", 'rb') as input:
             tmp_dict = pickle.load(input)
             self.__dict__.update(tmp_dict)
-
-    # Private methods
-    def __track_training(self, X, Y, X_val=None, Y_val=None, restart=False):
-        if restart:
-            self.train_accuracies = []
-            self.val_accuracies = []
-            self.train_losses = []
-            self.val_losses = []
-        # TODO(oleguer): Allow for other metrics
-        train_acc, train_loss = self.get_classification_metrics(X, Y)
-        val_acc, val_loss = self.get_classification_metrics(X_val, Y_val)
-        self.train_accuracies.append(train_acc)
-        self.val_accuracies.append(val_acc)
-        self.train_losses.append(train_loss)
-        self.val_losses.append(val_loss)
-        return val_acc

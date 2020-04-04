@@ -27,7 +27,7 @@ class Layer(ABC):
 # TRAINABLE LAYERS ######################################################
 
 class Dense(Layer):
-    def __init__(self, nodes, input_dim, weight_initialization="normal"):
+    def __init__(self, nodes, input_dim, weight_initialization="in_dim"):
         self.nodes = nodes
         self.input_shape = input_dim
         self.__initialize_weights(weight_initialization)
@@ -59,11 +59,11 @@ class Dense(Layer):
     def __initialize_weights(self, weight_initialization):
         if weight_initialization == "normal":
             self.weights = np.matrix(np.random.normal(
-                0, 1./100.,
+                0.0, 1./100.,
                                     (self.nodes, self.input_shape+1)))  # Add biases
         if weight_initialization == "in_dim":
             self.weights = np.matrix(np.random.normal(
-                0, 1./float(self.input_shape),
+                0.0, 1./float(np.sqrt(self.input_shape)),
                 (self.nodes, self.input_shape+1)))  # Add biases
         if weight_initialization == "xavier":
             limit = np.sqrt(6/(self.nodes+self.input_shape))

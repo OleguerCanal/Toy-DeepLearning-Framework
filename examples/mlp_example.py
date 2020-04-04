@@ -12,7 +12,7 @@ np.random.seed(1)
 
 if __name__ == "__main__":
     # Download & Extract CIFAR-10 Python (https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz)
-    # Put it in a Data folder
+    # Put it in a data folder
 
     # Load data
     x_train, y_train = LoadXY("data_batch_1")

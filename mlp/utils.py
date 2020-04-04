@@ -25,13 +25,6 @@ def plot(flatted_image, shape=(32, 32, 3), order='F'):
 	cv2.imshow("image", image)
 	cv2.waitKey()
 
-def prob_to_class(Y_pred_prob):
-	"""Given array of prob, returns max prob in one-hot fashon"""
-	idx = np.argmax(Y_pred_prob, axis=0)
-	Y_pred_class = np.zeros(Y_pred_prob.shape)
-	Y_pred_class[idx, np.arange(Y_pred_class.shape[1])] = 1
-	return Y_pred_class
-
 def accuracy(Y_pred_classes, Y_real):
 	return np.sum(np.multiply(Y_pred_classes, Y_real))/Y_pred_classes.shape[1]
 
