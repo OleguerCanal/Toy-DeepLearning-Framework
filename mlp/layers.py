@@ -95,3 +95,14 @@ class Relu(Layer):
     def backward(self, in_gradient, **kwargs):
         # TODO(Oleguer): review this
         return np.multiply((self.inputs > 0), in_gradient)
+
+class Dropout(Layer):
+    def __init__(self, ones_ratio=0.7):
+        self.ones_ratio = ones_ratio
+
+    def __call__(self, x):
+        self.mask = np.random.choice([0, 1], size=(x.shape), p=[1 - self.ones_ratio, self.ones_ratio])
+        return np.multiply(self.mask, x)
+
+    def backward(self, in_gradient, **kwargs):
+        return np.multiply(self.mask, in_gradient)

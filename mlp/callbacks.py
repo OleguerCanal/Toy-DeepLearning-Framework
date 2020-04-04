@@ -20,7 +20,7 @@ class Callback(ABC):
     def on_batch_end(self, model):
         pass
 
-    @abstractmethod
+    # @abstractmethod
     def on_epoch_end(self, model):
         """ Getss called at the end of each epoch
             Can modify model training variables (eg: LR Scheduler)
@@ -47,9 +47,11 @@ class MetricTracker(Callback):
 
     def on_batch_end(self, model):
         self.learning_rates.append(model.lr)
+        # self.__track(model)
 
     def on_epoch_end(self, model):
         self.__track(model)
+        pass
 
     def __track(self, model):
         train_metric, train_loss = model.get_metric_loss(model.X, model.Y)
@@ -126,7 +128,7 @@ class BestModelSaver(Callback):
         self.best_model_loss = None
         self.best_model_metric = None
 
-    def on_epoch_end(self, model):
+    def on_batch_end(self, model):
         val_metric = model.get_metric_loss(model.X_val, model.Y_val)[0]
         if val_metric >= self.best_metric:
             self.best_metric = model.val_metric

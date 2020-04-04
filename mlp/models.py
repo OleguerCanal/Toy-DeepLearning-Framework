@@ -1,4 +1,3 @@
-from utils import minibatch_split
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -10,6 +9,7 @@ import pickle
 import sys
 import pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
+from utils import minibatch_split
 
 # from callbacks import Callback, LearningRateScheduler
 
@@ -61,7 +61,7 @@ class Sequential:
 
     def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=None,
             iterations = None, lr=0.01, momentum=0.7, l2_reg=0.1,
-            shuffle_minibatch=True, callbacks=[]):
+            shuffle_minibatch=True, callbacks=[], **kwargs):
         """ Performs backrpop with given parameters.
             save_path is where model of best val accuracy will be saved
         """
