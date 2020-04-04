@@ -88,8 +88,9 @@ class Sequential:
 
         # Training
         stop = False
-        pbar = tqdm(list(range(self.epochs)))
-        for self.epoch in pbar:
+        # pbar = tqdm(list(range(self.epochs)))
+        # for self.epoch in pbar:
+        for self.epoch in range(self.epochs):
             for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch):
                 Y_pred_prob = self.predict(X_minibatch)  # Forward pass
                 gradient = self.loss.backward(
@@ -111,7 +112,7 @@ class Sequential:
             for callback in callbacks:
                 callback.on_epoch_end(self)
             # Update progressbar
-            pbar.set_description("Val acc: " + str(self.val_metric))
+            # pbar.set_description("Val acc: " + str(self.val_metric))
             if stop:
                 break
 
