@@ -1,6 +1,6 @@
 from utils import minibatch_split
 import numpy as np
-import matplotlib
+import matplotlib.pyplot as plt
 import time
 import math
 import copy
@@ -59,12 +59,15 @@ class Sequential:
                 w_norm += np.linalg.norm(layer.weights, 'fro')**2
         return loss_val + l2_reg*w_norm
 
-    def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=100,
-            lr=0.01, momentum=0.7, l2_reg=0.1, shuffle_minibatch=True,
-            callbacks=[]):
+    def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=None,
+            iterations = None, lr=0.01, momentum=0.7, l2_reg=0.1,
+            shuffle_minibatch=True, callbacks=[]):
         """ Performs backrpop with given parameters.
             save_path is where model of best val accuracy will be saved
         """
+        assert(epochs is None or iterations is None) # Only one can set it limit
+        if iterations is not None:
+            epochs = int(np.ceil(iterations/(X.shape[1]/batch_size)))
         # Store vars as class variables so they can be accessed by callbacks
         # TODO(think a better way)
         self.X = X
@@ -77,12 +80,14 @@ class Sequential:
         self.momentum = momentum
         self.l2_reg = l2_reg
         self.val_metric = 0
+        self.t = 0
 
         # Call callbacks
         for callback in callbacks:
             callback.on_training_begin(self)
 
         # Training
+        stop = False
         pbar = tqdm(list(range(self.epochs)))
         for self.epoch in pbar:
             for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch):
@@ -95,11 +100,21 @@ class Sequential:
                         lr=self.lr,  # Trainable layer parameters
                         momentum=self.momentum,
                         l2_regularization=self.l2_reg)
-
+                # Call callbacks
+                for callback in callbacks:
+                    callback.on_batch_end(self)
+                self.t += 1  # Step counter
+                if self.t >= iterations:
+                    stop = True
+                    break
             # Call callbacks
             for callback in callbacks:
                 callback.on_epoch_end(self)
+            # Update progressbar
             pbar.set_description("Val acc: " + str(self.val_metric))
+            if stop:
+                break
+
 
     # IO functions ################################################
     def save(self, path):

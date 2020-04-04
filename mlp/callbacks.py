@@ -14,7 +14,10 @@ class Callback(ABC):
     """ Abstract class to hold callbacks
     """
 
-    def on_training_begin(self, model):\
+    def on_training_begin(self, model):
+        pass
+
+    def on_batch_end(self, model):
         pass
 
     @abstractmethod
@@ -36,10 +39,14 @@ class MetricTracker(Callback):
         self.val_losses = []
         self.train_metrics = []
         self.val_metrics = []
+        self.learning_rates = []
 
     def on_training_begin(self, model):
         self.metric_name = model.metric.name
         self.__track(model)
+
+    def on_batch_end(self, model):
+        self.learning_rates.append(model.lr)
 
     def on_epoch_end(self, model):
         self.__track(model)
@@ -72,7 +79,7 @@ class MetricTracker(Callback):
         ax2 = ax1.twinx()
         ax2.set_ylabel(self.metric_name)
         ax2.set_ylim(bottom=0)
-        ax2.set_ylim(top=1.0)
+        ax2.set_ylim(top=1)
         n = len(self.train_metrics)
         ax2.plot(list(range(n)),
                  np.array(self.train_metrics), label="Train acc", c="green")
@@ -96,6 +103,18 @@ class MetricTracker(Callback):
         if show:
             plt.show()
 
+    def plot_lr_evolution(self, show=True, save=False, name="lr_evolution", subtitle=None):
+        plt.suptitle("Learning rate evolution")
+        plt.plot(self.learning_rates, label="Learning rate")
+        plt.legend(loc='upper right')
+        plt.xlabel("Iteration")
+        if save:
+            directory = "/".join(name.split("/")[:-1])
+            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+            plt.savefig(name + ".png")
+            plt.close()
+        if show:
+            plt.show()
 
 class BestModelSaver(Callback):
     def __init__(self, save_dir=None):
@@ -127,9 +146,28 @@ class BestModelSaver(Callback):
 # LEARNING PARAMS MODIFIER CALLBACKS ######################################################
 
 class LearningRateScheduler(Callback):
-    def __init__(self, evolution="linear"):
+    def __init__(self, evolution="linear", lr_min=None, lr_max=None, ns=500):
+        assert(evolution in ["constant", "linear", "cyclic"])
         self.type = evolution
+        self.lr_min = lr_min
+        self.lr_max = lr_max
+        self.ns = ns
+
+    def on_training_begin(self, model):
+        if self.type == "cyclic":
+            model.lr = self.lr_min
+
+    def on_batch_end(self, model):
+        if self.type == "cyclic":
+            slope = int(model.t/self.ns)%2
+            lr_dif = float(self.lr_max - self.lr_min)
+            if slope == 0:
+                model.lr = self.lr_min + float(model.t%self.ns)*lr_dif/float(self.ns)
+            if slope == 1:
+                model.lr = self.lr_max - float(model.t%self.ns)*lr_dif/float(self.ns)
 
     def on_epoch_end(self, model):
-        if self.type == "linear":
+        if self.type == "constant":
+            pass
+        elif self.type == "linear":
             model.lr = 0.9*model.lr
