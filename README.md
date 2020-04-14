@@ -55,20 +55,24 @@ callbacks = [mt, lrs]
 model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val,
         batch_size=100, epochs=100, l2_reg=0.01, momentum=0.1,
         callbacks=callbacks)
-mt.plot_training_progress()  # MetricTracker plots losses and metrics tracked
+mt.plot_training_progress()
 
 # Test model
 test_acc, test_loss = model.get_metric_loss(x_test, y_test)
 print("Test accuracy:", test_acc)
 ```
 
-**NOTE:** More architectures and features (RBF, SOM, DBF) comming soon
+Example of metrics tracked during training:
+![Training tracking](https://github.com/OleguerCanal/KTH_DeepLearning/blob/master/Assignment_2/figures/best.png)
+
+
+**NOTE:** More architectures, layers and features (CNN, RBF, SOM, DBF) comming soon
 
 # Utilities
 
 ## Meta-Parameter Optimization (MPO)
 
-Metaparameter Optimization is commonly used when training these kind of models. To ease the process I implemented a MetaParamOptimizer class with methods such as Grid Search (working on Gaussian Process Regression Optimization [here](https://github.com/fedetask/hyperparameter-optimization)):
+Metaparameter Optimization is commonly used when training these kind of models. To ease the process I implemented a MetaParamOptimizer class with methods such as Grid Search, additionally I jointly wrote a wrapper around [scikit-optimize](https://scikit-optimize.github.io/stable/) with [Federico Taschin](https://github.com/fedetask), to perform Bayesian Optimization [here](https://github.com/CampusAI/HyperParameter-Optimizer)).
 
 1. Define the **search space** and **fixed args** and a of your model in two diferent dictionaries
 2. Define an **evaluator** function which trains and evaluates your model in joined arguments, this function should return a ``dictionary`` with at least the key **"value"** (which MetaParamOptimizer will optimize).
@@ -116,5 +120,8 @@ best_model = mpo.grid_search(evaluator=evaluator,
 # This will run your evaluator function 3x3x3 = 27 times on all combinations of search_space params
 ```
 
+Example of Gaussian Process Regression Optimizer hyperparameter analysis:
+
+![Gaussian Process Regression Optimizer Analysis](https://github.com/OleguerCanal/KTH_DeepLearning/blob/master/Assignment_2/metaparam_search/evaluations.csv_objective_plot.png)
 
 
