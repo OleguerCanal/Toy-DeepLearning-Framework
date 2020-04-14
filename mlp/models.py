@@ -29,19 +29,22 @@ class Sequential:
         """Add layer"""
         self.layers.append(layer)
 
-    def predict(self, X):
+    def predict(self, X, apply_dropout=True):
         """Forward pass"""
         vals = X
-        for layer in self.layers:   
-            vals = layer(vals)
+        for layer in self.layers:
+            if layer.name == "Dropout":
+                vals = layer(vals, apply_dropout)
+            else:
+                vals = layer(vals)
         return vals
 
-    def get_metric_loss(self, X, Y_real):
+    def get_metric_loss(self, X, Y_real, use_dropout=True):
         """ Returns loss and classification accuracy """
         if X is None or Y_real is None:
             print("problem")
             return 0, np.inf
-        Y_pred_prob = self.predict(X)
+        Y_pred_prob = self.predict(X, use_dropout)
         metric_val = 0
         if self.metric is not None:
             metric_val = self.metric(Y_pred_prob, Y_real)
@@ -88,9 +91,9 @@ class Sequential:
 
         # Training
         stop = False
-        # pbar = tqdm(list(range(self.epochs)))
-        # for self.epoch in pbar:
-        for self.epoch in range(self.epochs):
+        pbar = tqdm(list(range(self.epochs)))
+        for self.epoch in pbar:
+        # for self.epoch in range(self.epochs):
             for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch):
                 Y_pred_prob = self.predict(X_minibatch)  # Forward pass
                 gradient = self.loss.backward(

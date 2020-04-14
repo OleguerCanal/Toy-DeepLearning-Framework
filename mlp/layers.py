@@ -9,6 +9,7 @@ class Layer(ABC):
             - __call__ method to apply Layer function to the inputs
             - gradient method to add Layer function gradient to the backprop
     """
+    name = "GenericLayer"
 
     def __init__(self):
         self.weights = None
@@ -98,11 +99,14 @@ class Relu(Layer):
 
 class Dropout(Layer):
     def __init__(self, ones_ratio=0.7):
+        self.name = "Dropout"
         self.ones_ratio = ones_ratio
 
-    def __call__(self, x):
-        self.mask = np.random.choice([0, 1], size=(x.shape), p=[1 - self.ones_ratio, self.ones_ratio])
-        return np.multiply(self.mask, x)
+    def __call__(self, x, apply=True):
+        if apply:
+            self.mask = np.random.choice([0, 1], size=(x.shape), p=[1 - self.ones_ratio, self.ones_ratio])
+            return np.multiply(self.mask, x)
+        return x
 
     def backward(self, in_gradient, **kwargs):
         return np.multiply(self.mask, in_gradient)

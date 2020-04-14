@@ -46,20 +46,22 @@ class MetricTracker(Callback):
         self.__track(model)
 
     def on_batch_end(self, model):
-        self.learning_rates.append(model.lr)
+        # self.learning_rates.append(model.lr)
         # self.__track(model)
+        pass
 
     def on_epoch_end(self, model):
         self.__track(model)
         pass
 
     def __track(self, model):
-        train_metric, train_loss = model.get_metric_loss(model.X, model.Y)
-        val_metric, val_loss = model.get_metric_loss(model.X_val, model.Y_val)
+        train_metric, train_loss = model.get_metric_loss(model.X, model.Y, use_dropout=False)
+        val_metric, val_loss = model.get_metric_loss(model.X_val, model.Y_val, use_dropout=False)
         self.train_losses.append(train_loss)
         self.val_losses.append(val_loss)
         self.train_metrics.append(train_metric)
         self.val_metrics.append(val_metric)
+        self.learning_rates.append(model.lr)
         model.val_metric = val_metric
 
     def plot_training_progress(self, show=True, save=False, name="model_results", subtitle=None):
@@ -118,6 +120,25 @@ class MetricTracker(Callback):
         if show:
             plt.show()
 
+    def plot_acc_vs_lr(self, show=True, save=False, name="acc_vs_lr", subtitle=None):
+        plt.suptitle("Accuracy evolution for each learning rate")
+        plt.plot(np.log(self.learning_rates), self.train_metrics, label="Accuracy")
+        plt.legend(loc='upper right')
+        plt.xlabel("Learning Rate")
+        plt.ylabel("Train Accuracy")
+        if save:
+            directory = "/".join(name.split("/")[:-1])
+            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+            plt.savefig(name + ".png")
+            plt.close()
+        if show:
+            plt.show()
+
+    def save(self, file):
+        np.save(file + "_lr", self.learning_rates)
+        np.save(file + "_acc", self.train_metrics)
+
+
 class BestModelSaver(Callback):
     def __init__(self, save_dir=None):
         self.save_dir = None
@@ -167,6 +188,9 @@ class LearningRateScheduler(Callback):
                 model.lr = self.lr_min + float(model.t%self.ns)*lr_dif/float(self.ns)
             if slope == 1:
                 model.lr = self.lr_max - float(model.t%self.ns)*lr_dif/float(self.ns)
+        if self.type == "linear":
+            lr_dif = float(self.lr_max - self.lr_min)
+            model.lr = self.lr_min + float(model.t)*lr_dif/float(self.ns)
 
     def on_epoch_end(self, model):
         if self.type == "constant":
