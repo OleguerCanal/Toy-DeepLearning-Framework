@@ -10,6 +10,8 @@ from mlp.utils import LoadXY
 
 np.random.seed(1)
 
+# TODO(oleguer): Update this example to newest refactor
+
 if __name__ == "__main__":
     # Download & Extract CIFAR-10 Python (https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz)
     # Put it in a data folder
