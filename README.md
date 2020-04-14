@@ -1,9 +1,8 @@
 # Deep Learning Framework Playground
 
-Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend.
+Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend and hand-written gradients.
 
-As all my other repos, this is more an exercise for me to make sure I understand the main Deep Learning architectures and algorithms, rather than useful code.
-Hope it also helps you understand them!
+As all my other repos, this is more an exercise for me to make sure I understand the main Deep Learning architectures and algorithms, rather than useful code to fit models. Hope this (super) simplified "Keras" re-implementation also helps you understand them!
 
 # Architectures:
 
@@ -15,38 +14,51 @@ The model (as for now) presents the following features:
 - **Layers:**
     - Trainable: Dense
     - Activation: Relu, Softmax
+    - Regularization: Dropout
 - **Losses:**
     - CrossEntropy
     - CategoricalHinge
 - **Optimizer:** Minibatch Gradient Descent BackProp Training with customizable:
     - Batch Size
-    - Epochs
-    - Learning Rate
+    - Epochs / Iterations
     - Momentum
     - L2 Regularization Term
-    - Train/Val Loss & accuracy tracking
+- **Callbacks:**
+    - Learning Rate Scheduler: Constant, Linear, Cyclic
+    - Loss & Metrics tracker
+    - Early Stopper
 
 
 Code Example:
 ```python
-from mlp.layers import Dense, Relu, Softmax
+# Imports
+from mlp.callbacks import MetricTracker, LearningRateScheduler
+from mlp.layers import Dense, Softmax, Relu, Dropout
+from mlp.losses import CrossEntropy
 from mlp.models import Sequential
+from mlp.metrics import Accuracy
 
 # Define model
-model = Sequential(loss=CrossEntropy())
-model.add(Dense(nodes=512, input_dim=x_train.shape[0]))
+model = Sequential(loss=CrossEntropy(), metric=Accuracy())
+model.add(Dense(nodes=800, input_dim=x_train.shape[0]))
 model.add(Relu())
-model.add(Dense(nodes=10, input_dim=512))
+model.add(Dropout(0.8))
+model.add(Dense(nodes=10, input_dim=800))
 model.add(Softmax())
 
+# Define callbacks
+mt = MetricTracker()  # Stores training evolution info (losses and metrics)
+lrs = LearningRateScheduler(evolution="cyclic", lr_min=1e-5, lr_max=1e-1)
+callbacks = [mt, lrs]
 
 # Fit model
 model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val,
-        batch_size=200, epochs=100, lr=0.0001, momentum=0.1, l2_reg=0.1)
-model.plot_training_progress()
+        batch_size=100, epochs=100, l2_reg=0.01, momentum=0.1,
+        callbacks=callbacks)
+mt.plot_training_progress()  # MetricTracker plots losses and metrics tracked
 
 # Test model
-test_acc, test_loss = model.get_metrics(x_test, y_test)
+test_acc, test_loss = model.get_metric_loss(x_test, y_test)
 print("Test accuracy:", test_acc)
 ```
 
