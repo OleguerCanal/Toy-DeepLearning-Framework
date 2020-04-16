@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import copy
 import numpy as np
 
-
 class Layer(ABC):
     """ Abstact class to represent Layer layers
         An Layer has:
@@ -24,6 +23,43 @@ class Layer(ABC):
         """ Receives right-layer gradient and multiplies it by current layer gradient """
         pass
 
+
+# Activation Layers ######################################################
+class Softmax(Layer):
+    def __call__(self, x):
+        self.outputs = np.exp(x) / np.sum(np.exp(x), axis=0)
+        return self.outputs
+
+    def backward(self, in_gradient, **kwargs):
+        diags = np.einsum("ik,ij->ijk", self.outputs,
+                          np.eye(self.outputs.shape[0]))
+        out_prod = np.einsum("ik,jk->ijk", self.outputs, self.outputs)
+        gradient = np.einsum("ijk,jk->ik", (diags - out_prod), in_gradient)
+        return gradient
+
+
+class Relu(Layer):
+    def __call__(self, x):
+        self.inputs = x
+        return np.multiply(x, (x > 0))
+
+    def backward(self, in_gradient, **kwargs):
+        # TODO(Oleguer): review this
+        return np.multiply((self.inputs > 0), in_gradient)
+
+class Dropout(Layer):
+    def __init__(self, ones_ratio=0.7):
+        self.name = "Dropout"
+        self.ones_ratio = ones_ratio
+
+    def __call__(self, x, apply=True):
+        if apply:
+            self.mask = np.random.choice([0, 1], size=(x.shape), p=[1 - self.ones_ratio, self.ones_ratio])
+            return np.multiply(self.mask, x)
+        return x
+
+    def backward(self, in_gradient, **kwargs):
+        return np.multiply(self.mask, in_gradient)
 
 # TRAINABLE LAYERS ######################################################
 
@@ -74,39 +110,49 @@ class Dense(Layer):
                 size=(self.nodes, self.input_shape+1)))  # Add biases
 
 
-# Activation Layers ######################################################
-class Softmax(Layer):
-    def __call__(self, x):
-        self.outputs = np.exp(x) / np.sum(np.exp(x), axis=0)
-        return self.outputs
+class Conv2D(Layer):
+    def __init__(self, num_filters = 5, kernel_shape = (5, 5, 1)):
+        self.filters = []
+        self.kernel_shape = kernel_shape
+        for i in range(num_filters):
+            # kernel = np.matrix(np.random.normal(0.0, 1./100., kernel_shape))
+            kernel = np.ones(kernel_shape)/3
+            if len(kernel.shape) == 2:
+                kernel = np.expand_dims(kernel, axis=2)
+            self.filters.append(kernel)
+        self.filters = np.array(self.filters)
+        pass
 
-    def backward(self, in_gradient, **kwargs):
-        diags = np.einsum("ik,ij->ijk", self.outputs,
-                          np.eye(self.outputs.shape[0]))
-        out_prod = np.einsum("ik,jk->ijk", self.outputs, self.outputs)
-        gradient = np.einsum("ijk,jk->ik", (diags - out_prod), in_gradient)
-        return gradient
+    def __call__(self, inputs):
+        """ Forward pass of Conv Layer
+            input should have shape (height, width, channels, n_images)
+            channels should match kernel_shape
+        """
+        assert(len(inputs.shape) == 4) # Input must have shape (height, width, channels, n_images)
+        assert(self.kernel_shape[2] == inputs.shape[2])  # Filter number of channels must match input channels
 
+        # Input shapes
+        in_h = inputs.shape[0]
+        in_w = inputs.shape[1]
+        in_c = inputs.shape[2]
+        in_n = inputs.shape[3]
+        # Filter shapes
+        ker_h = self.kernel_shape[0]
+        ker_w = self.kernel_shape[1]
+        f = self.filters.shape[0]
+        # Output shapes
+        out_h = in_h - ker_h + 1
+        out_w = in_w - ker_w + 1
+        out_c = f
+        out_n = in_n
+        output = np.empty(shape=(out_h, out_w, out_c, out_n))
 
-class Relu(Layer):
-    def __call__(self, x):
-        self.inputs = x
-        return np.multiply(x, (x > 0))
+        for i in range(out_h):
+            for j in range(out_w):
+                output[i, j, :, :] = np.einsum("ijcn,kijc->kn",\
+                     inputs[i:i+ker_h, j:j+ker_w, :, :], self.filters)
 
-    def backward(self, in_gradient, **kwargs):
-        # TODO(Oleguer): review this
-        return np.multiply((self.inputs > 0), in_gradient)
+        return output
 
-class Dropout(Layer):
-    def __init__(self, ones_ratio=0.7):
-        self.name = "Dropout"
-        self.ones_ratio = ones_ratio
-
-    def __call__(self, x, apply=True):
-        if apply:
-            self.mask = np.random.choice([0, 1], size=(x.shape), p=[1 - self.ones_ratio, self.ones_ratio])
-            return np.multiply(self.mask, x)
-        return x
-
-    def backward(self, in_gradient, **kwargs):
-        return np.multiply(self.mask, in_gradient)
+    def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
+        pass
