@@ -113,6 +113,8 @@ class Dense(Layer):
 class Conv2D(Layer):
     def __init__(self, num_filters = 5, kernel_shape = (5, 5, 1)):
         self.filters = []
+        self.biases = np.zeros(num_filters)
+        # self.biases = np.array([0, 1])
         self.kernel_shape = kernel_shape
         for i in range(num_filters):
             # kernel = np.matrix(np.random.normal(0.0, 1./100., kernel_shape))
@@ -131,28 +133,26 @@ class Conv2D(Layer):
         assert(len(inputs.shape) == 4) # Input must have shape (height, width, channels, n_images)
         assert(self.kernel_shape[2] == inputs.shape[2])  # Filter number of channels must match input channels
 
-        # Input shapes
-        in_h = inputs.shape[0]
-        in_w = inputs.shape[1]
-        in_c = inputs.shape[2]
-        in_n = inputs.shape[3]
-        # Filter shapes
-        ker_h = self.kernel_shape[0]
-        ker_w = self.kernel_shape[1]
-        f = self.filters.shape[0]
-        # Output shapes
+        # Compute shapes
+        (in_h, in_w, in_c, in_n) = inputs.shape
+        (ker_h, ker_w, _) = self.kernel_shape
         out_h = in_h - ker_h + 1
         out_w = in_w - ker_w + 1
-        out_c = f
+        out_c = self.filters.shape[0]  # Number of filters
         out_n = in_n
         output = np.empty(shape=(out_h, out_w, out_c, out_n))
 
+        # Compute convolution
         for i in range(out_h):
             for j in range(out_w):
                 output[i, j, :, :] = np.einsum("ijcn,kijc->kn",\
                      inputs[i:i+ker_h, j:j+ker_w, :, :], self.filters)
-
+        # Add biases
+        output += np.einsum("ijcn,c->ijcn", np.ones(output.shape), self.biases)
         return output
 
     def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
+        """ Weight update
+        """
+
         pass
