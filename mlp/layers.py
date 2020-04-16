@@ -144,15 +144,14 @@ class Conv2D(Layer):
         assert(self.kernel_shape[2] == inputs.shape[2])  # Filter number of channels must match input channels
 
         # Compute shapes
-        (in_h, in_w, in_c, in_n) = inputs.shape
+        self.inputs = inputs
+        (in_h, in_w, in_c, in_n) = self.inputs.shape
         (ker_h, ker_w, _) = self.kernel_shape
         out_h = in_h - ker_h + 1
         out_w = in_w - ker_w + 1
-        out_c = self.filters.shape[0]  # Number of filters
-        out_n = in_n
-        output = np.empty(shape=(out_h, out_w, out_c, out_n))
 
         # Compute convolution
+        output = np.empty(shape=(out_h, out_w, self.filters.shape[0], in_n))
         for i in range(out_h):
             for j in range(out_w):
                 output[i, j, :, :] = np.einsum("ijcn,kijc->kn",\
@@ -164,5 +163,23 @@ class Conv2D(Layer):
     def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
         """ Weight update
         """
+        left_layer_gradient = np.zeros(self.input_shape)
+        filter_gradients = np.zeros(self.filters.shape)
+        bias_gradients = np.average(in_gradient, axis=(0, 1, 3))
 
-        pass
+        (in_h, in_w, in_c, in_n) = self.inputs.shape
+        (out_h, out_w, out_c, out_n) = in_gradient.shape
+        (ker_h, ker_w, _) = self.kernel_shape
+
+        for i in range(out_h):
+            for j in range(out_w):
+                in_block = inputs[i:i+ker_h, j:j+ker_w, :, :]
+                grad_block = in_gradient[i, j, :, :]
+                filter_gradients += np.average(np.einsum("ijcn,cn->ijcn",\
+                    in_block, grad_block), axis=3)
+                left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] +=\
+                    np.einsum("kijc,kn->ijcn", self.filters, grad_block)
+        
+        self.filters += lr*filter_gradients  #TODO(oleguer): Add momentum and regularization
+        self.biases += lr*bias_gradients
+        return left_layer_gradient
