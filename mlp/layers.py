@@ -24,7 +24,7 @@ class Layer(ABC):
         pass
 
 
-# Activation Layers ######################################################
+# Activation Layers #####################################################
 class Softmax(Layer):
     def __call__(self, x):
         self.outputs = np.exp(x) / np.sum(np.exp(x), axis=0)
@@ -37,7 +37,6 @@ class Softmax(Layer):
         gradient = np.einsum("ijk,jk->ik", (diags - out_prod), in_gradient)
         return gradient
 
-
 class Relu(Layer):
     def __call__(self, x):
         self.inputs = x
@@ -47,6 +46,7 @@ class Relu(Layer):
         # TODO(Oleguer): review this
         return np.multiply((self.inputs > 0), in_gradient)
 
+# MISC LAYERS ###########################################################
 class Dropout(Layer):
     def __init__(self, ones_ratio=0.7):
         self.name = "Dropout"
@@ -61,6 +61,16 @@ class Dropout(Layer):
     def backward(self, in_gradient, **kwargs):
         return np.multiply(self.mask, in_gradient)
 
+class Flatten(Layer):
+    def __call__(self, inputs):
+        self.__in_shape = inputs.shape  # Store inputs shape to use in backprop
+        m = inputs.shape[0]*inputs.shape[1]*inputs.shape[2]
+        n_points = inputs.shape[3]
+        return inputs.reshape((m, n_points))
+
+    def backward(self, in_gradient):
+        return in_gradient.reshape(self.__in_shape)
+        
 # TRAINABLE LAYERS ######################################################
 
 class Dense(Layer):
