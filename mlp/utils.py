@@ -30,17 +30,17 @@ def accuracy(Y_pred_classes, Y_real):
 
 def minibatch_split(X, Y, batch_size, shuffle=True):
 	"""Yields splited X, Y matrices in minibatches of given batch_size"""
-	if (batch_size is None) or (batch_size > X.shape[1]):
-		batch_size = X.shape[1]
-	indx = list(range(X.shape[1]))
+	if (batch_size is None) or (batch_size > X.shape[-1]):
+		batch_size = X.shape[-1]
+	indx = list(range(X.shape[-1]))
 	if shuffle:
 		np.random.shuffle(indx)
-	for i in range(int(X.shape[1]/batch_size)):
+	for i in range(int(X.shape[-1]/batch_size)):
 		pos = i*batch_size
 		# Get minibatch
-		X_minibatch = X[:, indx[pos:pos+batch_size]]
-		Y_minibatch = Y[:, indx[pos:pos+batch_size]]
-		if i == int(X.shape[1]/batch_size) - 1:  # Get all the remaining
-			X_minibatch = X[:, indx[pos:]]
-			Y_minibatch = Y[:, indx[pos:]]
+		X_minibatch = X[..., indx[pos:pos+batch_size]]
+		Y_minibatch = Y[..., indx[pos:pos+batch_size]]
+		if i == int(X.shape[-1]/batch_size) - 1:  # Get all the remaining
+			X_minibatch = X[..., indx[pos:]]
+			Y_minibatch = Y[..., indx[pos:]]
 		yield X_minibatch, Y_minibatch

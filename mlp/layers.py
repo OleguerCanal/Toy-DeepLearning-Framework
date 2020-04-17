@@ -112,8 +112,8 @@ class Flatten(Layer):
         n_points = inputs.shape[3]
         return inputs.reshape((m, n_points))
 
-    def backward(self, in_gradient):
-        return in_gradient.reshape(self.__in_shape)
+    def backward(self, in_gradient, **kwargs):
+        return np.array(in_gradient).reshape(self.__in_shape)
         
 # TRAINABLE LAYERS ######################################################
 
@@ -134,12 +134,12 @@ class Dense(Layer):
     def __call__(self, inputs):
         self.inputs = np.append(
             inputs, [np.ones(inputs.shape[1])], axis=0)  # Add biases
-        return self.weights*self.inputs
+        return np.dot(self.weights, self.inputs)
 
     def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
         # Previous layer error propagation
         # Remove bias TODO Think about this
-        left_layer_gradient = (self.weights.T*in_gradient)[:-1, :]
+        left_layer_gradient = (np.dot(self.weights.T,in_gradient))[:-1, :]
 
         # Regularization
         regularization_weights = copy.deepcopy(self.weights)
@@ -149,7 +149,7 @@ class Dense(Layer):
 
         # Weight update
         # TODO: Rremove self if not going to update it
-        self.gradient = in_gradient*self.inputs.T + regularization_term
+        self.gradient = np.dot(in_gradient, self.inputs.T) + regularization_term
         self.dw = momentum*self.dw + (1-momentum)*self.gradient
         self.weights -= lr*self.dw
         return left_layer_gradient
@@ -193,11 +193,12 @@ class Conv2D(Layer):
             channels should match kernel_shape
         """
         assert(len(inputs.shape) == 4) # Input must have shape (height, width, channels, n_images)
+        assert(inputs.shape[:3] == self.input_shape)  # Set input shape does not match with input sent
         assert(self.filters.shape[3] == inputs.shape[2])  # Filter number of channels must match input channels
 
         # Get shapes
         (ker_h, ker_w) = self.kernel_shape
-        (out_h, out_w, _, _) = self.output_shape
+        (out_h, out_w, _,) = self.output_shape
 
         # Compute convolution
         self.inputs = inputs  # Will be used in back pass
@@ -213,7 +214,7 @@ class Conv2D(Layer):
     def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
         """ Weight update
         """
-        left_layer_gradient = np.zeros(self.input_shape)
+        left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
         self.filter_gradients = np.zeros(self.filters.shape)  # Save it to compare with numerical (DEBUG)
         self.bias_gradients = np.average(in_gradient, axis=(0, 1, 3))
 
@@ -225,10 +226,11 @@ class Conv2D(Layer):
 
         for i in range(out_h):
             for j in range(out_w):
-                in_block = inputs[i:i+ker_h, j:j+ker_w, :, :]
+                in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
                 grad_block = in_gradient[i, j, :, :]
-                self.filter_gradients += np.average(np.einsum("ijcn,cn->ijcn",\
-                    in_block, grad_block), axis=3)
+                filter_grad = np.average(\
+                    np.einsum("ijcn,kn->ijckn", in_block, grad_block), axis=-1)
+                self.filter_gradients += np.moveaxis(filter_grad, -1, 0)  # First axis is the filter
                 left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] +=\
                     np.einsum("kijc,kn->ijcn", self.filters, grad_block)
 

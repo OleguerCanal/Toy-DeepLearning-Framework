@@ -28,6 +28,10 @@ class Sequential:
     def add(self, layer):
         """Add layer"""
         self.layers.append(layer)
+        if len(self.layers) > 1: # Compile layer using output shape of previous layer
+            assert(self.layers[-2].is_compiled)  # Input/Output shapes not set for previous layer!
+            # Set input shape to be previous layer output_shape
+            self.layers[-1].compile(input_shape=self.layers[-2].output_shape)
 
     def predict(self, X, apply_dropout=True):
         """Forward pass"""
@@ -70,7 +74,10 @@ class Sequential:
         """
         assert(epochs is None or iterations is None) # Only one can set it limit
         if iterations is not None:
-            epochs = int(np.ceil(iterations/(X.shape[1]/batch_size)))
+            epochs = int(np.ceil(iterations/(X.shape[-1]/batch_size)))
+        else:
+            iterations = int(epochs*np.ceil((X.shape[-1]/batch_size)))
+
         # Store vars as class variables so they can be accessed by callbacks
         # TODO(think a better way)
         self.X = X
@@ -107,15 +114,15 @@ class Sequential:
                 # Call callbacks
                 for callback in callbacks:
                     callback.on_batch_end(self)
-                self.t += 1  # Step counter
                 if self.t >= iterations:
                     stop = True
                     break
+                self.t += 1  # Step counter
             # Call callbacks
             for callback in callbacks:
                 callback.on_epoch_end(self)
             # Update progressbar
-            # pbar.set_description("Val acc: " + str(self.val_metric))
+            pbar.set_description("Val acc: " + str(self.val_metric))
             if stop:
                 break
 
