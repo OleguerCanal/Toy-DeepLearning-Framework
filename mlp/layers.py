@@ -2,9 +2,12 @@ from abc import ABC, abstractmethod
 import copy
 import numpy as np
 
+# Layer Templates #######################################################
+
 class Layer(ABC):
-    """ Abstact class to represent Layer layers
-        An Layer has:
+    """ Abstact class to represent Layers
+        A Layer has:
+            - compile  method which computes input/output shapes (and intializes weights)
             - __call__ method to apply Layer function to the inputs
             - gradient method to add Layer function gradient to the backprop
     """
@@ -12,6 +15,27 @@ class Layer(ABC):
 
     def __init__(self):
         self.weights = None
+        self.is_compiled = False
+        self.input_shape = None
+        self.output_shape = None
+        # NOTE: INPUT/OUTPUT shapes ignore 
+
+    @abstractmethod
+    def compile(self, input_shape):
+        """ Updates self.input_shape (and self.output_shape)
+            If input_dim not set by user, when added to a model 
+            this method is called based on previous layer output_shape
+            
+            For trainable layers, it also should initializes weights and
+            gradient placeholders according to input_shape.
+            
+            Note: input_shape should be a tuple of the shape
+            ignoring the number of samples (last elem)
+        """
+        input_shape = input_shape if type(input_shape) is tuple else (input_shape, )
+        self.input_shape = input_shape
+        self.is_compiled = True
+        # print("compiled")
 
     @abstractmethod
     def __call__(self, inputs):
@@ -23,9 +47,20 @@ class Layer(ABC):
         """ Receives right-layer gradient and multiplies it by current layer gradient """
         pass
 
+class ConstantShapeLayer(Layer):
+    """ Common structure of Layers which do not modify the shape of input and output
+    """
+    def __init__(self, input_shape = None):
+        if input_shape is not None:
+            self.compile(input_shape)
+        
+    def compile(self, input_shape):
+        super().compile(input_shape)  # Populates self.input_shape and self.is_compiled
+        self.output_shape = self.input_shape
+
 
 # Activation Layers #####################################################
-class Softmax(Layer):
+class Softmax(ConstantShapeLayer):
     def __call__(self, x):
         self.outputs = np.exp(x) / np.sum(np.exp(x), axis=0)
         return self.outputs
@@ -37,7 +72,7 @@ class Softmax(Layer):
         gradient = np.einsum("ijk,jk->ik", (diags - out_prod), in_gradient)
         return gradient
 
-class Relu(Layer):
+class Relu(ConstantShapeLayer):
     def __call__(self, x):
         self.inputs = x
         return np.multiply(x, (x > 0))
@@ -47,7 +82,7 @@ class Relu(Layer):
         return np.multiply((self.inputs > 0), in_gradient)
 
 # MISC LAYERS ###########################################################
-class Dropout(Layer):
+class Dropout(ConstantShapeLayer):
     def __init__(self, ones_ratio=0.7):
         self.name = "Dropout"
         self.ones_ratio = ones_ratio
@@ -62,9 +97,18 @@ class Dropout(Layer):
         return np.multiply(self.mask, in_gradient)
 
 class Flatten(Layer):
+    def __init__(self, input_shape=None):
+        super().__init__()
+        if input_shape is not None:
+            self.compile(input_shape)
+
+    def compile(self, input_shape):
+        super().compile(input_shape)  # Updates self.input_shape and self.is_compiled
+        self.output_shape = (np.prod(self.input_shape),)
+
     def __call__(self, inputs):
         self.__in_shape = inputs.shape  # Store inputs shape to use in backprop
-        m = inputs.shape[0]*inputs.shape[1]*inputs.shape[2]
+        m = self.output_shape[0]
         n_points = inputs.shape[3]
         return inputs.reshape((m, n_points))
 
@@ -74,11 +118,18 @@ class Flatten(Layer):
 # TRAINABLE LAYERS ######################################################
 
 class Dense(Layer):
-    def __init__(self, nodes, input_dim, weight_initialization="in_dim"):
+    def __init__(self, nodes, input_dim=None, weight_initialization="in_dim"):
+        super().__init__()
         self.nodes = nodes
-        self.input_shape = input_dim
-        self.__initialize_weights(weight_initialization)
+        self.weight_initialization = weight_initialization
+        if input_dim is not None:  # If user sets input, automatically compile
+            self.compile(input_dim)
+
+    def compile(self, input_shape):
+        super().compile(input_shape)  # Updates self.input_shape and self.is_compiled
+        self.__initialize_weights(self.weight_initialization)
         self.dw = np.zeros(self.weights.shape)  # Weight updates
+        self.output_shape = (self.nodes,)
 
     def __call__(self, inputs):
         self.inputs = np.append(
@@ -107,33 +158,34 @@ class Dense(Layer):
         if weight_initialization == "normal":
             self.weights = np.matrix(np.random.normal(
                 0.0, 1./100.,
-                                    (self.nodes, self.input_shape+1)))  # Add biases
+                                    (self.nodes, self.input_shape[0]+1)))  # Add biases
         if weight_initialization == "in_dim":
             self.weights = np.matrix(np.random.normal(
-                0.0, 1./float(np.sqrt(self.input_shape)),
-                (self.nodes, self.input_shape+1)))  # Add biases
+                0.0, 1./float(np.sqrt(self.input_shape[0])),
+                (self.nodes, self.input_shape[0]+1)))  # Add biases
         if weight_initialization == "xavier":
-            limit = np.sqrt(6/(self.nodes+self.input_shape))
+            limit = np.sqrt(6/(self.nodes+self.input_shape[0]))
             self.weights = np.matrix(np.random.uniform(
                 low=-limit,
                 high=limit,
-                size=(self.nodes, self.input_shape+1)))  # Add biases
+                size=(self.nodes, self.input_shape[0]+1)))  # Add biases
 
 
 class Conv2D(Layer):
-    def __init__(self, num_filters = 5, kernel_shape = (5, 5, 1)):
-        self.filters = []
-        self.biases = np.zeros(num_filters)
-        # self.biases = np.array([0, 1])
+    def __init__(self, num_filters = 5, kernel_shape = (5, 5), input_shape=None):
+        self.num_filters = num_filters
         self.kernel_shape = kernel_shape
-        for i in range(num_filters):
-            # kernel = np.matrix(np.random.normal(0.0, 1./100., kernel_shape))
-            kernel = np.ones(kernel_shape)/3
-            if len(kernel.shape) == 2:
-                kernel = np.expand_dims(kernel, axis=2)
-            self.filters.append(kernel)
-        self.filters = np.array(self.filters)
-        pass
+        if input_shape is not None:
+            self.compile(input_shape)  # Only care about channels
+
+    def compile(self, input_shape):
+        assert(len(input_shape) == 3) # Input shape must be (height, width, channels,)
+        super().compile(input_shape)
+        (ker_h, ker_w) = self.kernel_shape
+        out_h = input_shape[0] - ker_h + 1
+        out_w = input_shape[1] - ker_w + 1
+        self.output_shape = (out_h, out_w, self.num_filters,)
+        self.__initialize_weights()
 
     def __call__(self, inputs):
         """ Forward pass of Conv Layer
@@ -141,17 +193,15 @@ class Conv2D(Layer):
             channels should match kernel_shape
         """
         assert(len(inputs.shape) == 4) # Input must have shape (height, width, channels, n_images)
-        assert(self.kernel_shape[2] == inputs.shape[2])  # Filter number of channels must match input channels
+        assert(self.filters.shape[3] == inputs.shape[2])  # Filter number of channels must match input channels
 
-        # Compute shapes
-        self.inputs = inputs
-        (in_h, in_w, in_c, in_n) = self.inputs.shape
-        (ker_h, ker_w, _) = self.kernel_shape
-        out_h = in_h - ker_h + 1
-        out_w = in_w - ker_w + 1
+        # Get shapes
+        (ker_h, ker_w) = self.kernel_shape
+        (out_h, out_w, _, _) = self.output_shape
 
         # Compute convolution
-        output = np.empty(shape=(out_h, out_w, self.filters.shape[0], in_n))
+        self.inputs = inputs  # Will be used in back pass
+        output = np.empty(shape = self.output_shape + (self.inputs.shape[3],))
         for i in range(out_h):
             for j in range(out_w):
                 output[i, j, :, :] = np.einsum("ijcn,kijc->kn",\
@@ -164,22 +214,37 @@ class Conv2D(Layer):
         """ Weight update
         """
         left_layer_gradient = np.zeros(self.input_shape)
-        filter_gradients = np.zeros(self.filters.shape)
-        bias_gradients = np.average(in_gradient, axis=(0, 1, 3))
+        self.filter_gradients = np.zeros(self.filters.shape)  # Save it to compare with numerical (DEBUG)
+        self.bias_gradients = np.average(in_gradient, axis=(0, 1, 3))
 
-        (in_h, in_w, in_c, in_n) = self.inputs.shape
-        (out_h, out_w, out_c, out_n) = in_gradient.shape
-        (ker_h, ker_w, _) = self.kernel_shape
+        (out_h, out_w, _, _) = in_gradient.shape
+        (ker_h, ker_w) = self.kernel_shape
+
+        assert(out_h == self.output_shape[0])  # Incoming gradient shape must match layer output shape
+        assert(out_w == self.output_shape[1])  # Incoming gradient shape must match layer output shape
 
         for i in range(out_h):
             for j in range(out_w):
                 in_block = inputs[i:i+ker_h, j:j+ker_w, :, :]
                 grad_block = in_gradient[i, j, :, :]
-                filter_gradients += np.average(np.einsum("ijcn,cn->ijcn",\
+                self.filter_gradients += np.average(np.einsum("ijcn,cn->ijcn",\
                     in_block, grad_block), axis=3)
                 left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] +=\
                     np.einsum("kijc,kn->ijcn", self.filters, grad_block)
-        
-        self.filters += lr*filter_gradients  #TODO(oleguer): Add momentum and regularization
-        self.biases += lr*bias_gradients
+
+        self.filters += lr*self.filter_gradients  #TODO(oleguer): Add momentum and regularization
+        self.biases += lr*self.bias_gradients
         return left_layer_gradient
+
+    def __initialize_weights(self):
+        self.filters = []
+        self.biases = np.zeros(self.num_filters)
+        full_kernel_shape = self.kernel_shape + (self.input_shape[2],)
+        # self.biases = np.array([0, 1])
+        for i in range(self.num_filters):
+            kernel = np.random.normal(0.0, 1./100., full_kernel_shape)
+            # kernel = np.ones(full_kernel_shape)/3
+            if len(kernel.shape) == 2:
+                kernel = np.expand_dims(kernel, axis=2)
+            self.filters.append(kernel)
+        self.filters = np.array(self.filters)
