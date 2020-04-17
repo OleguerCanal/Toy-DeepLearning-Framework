@@ -1,6 +1,6 @@
 # Deep Learning Framework Playground
 
-Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend and hand-written gradients.
+Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend (using hand-written gradients) and MatPlotLib for plotting.
 
 As all my other repos, this is more an exercise for me to make sure I understand the main Deep Learning architectures and algorithms, rather than useful code to fit models. Hope this (super) simplified "Keras" re-implementation also helps you understand them!
 
