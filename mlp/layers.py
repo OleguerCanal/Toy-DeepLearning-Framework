@@ -3,7 +3,6 @@ import copy
 import numpy as np
 
 # Layer Templates #######################################################
-
 class Layer(ABC):
     """ Abstact class to represent Layers
         A Layer has:
@@ -51,6 +50,7 @@ class ConstantShapeLayer(Layer):
     """ Common structure of Layers which do not modify the shape of input and output
     """
     def __init__(self, input_shape = None):
+        super().__init__()
         if input_shape is not None:
             self.compile(input_shape)
         
@@ -114,9 +114,9 @@ class Flatten(Layer):
 
     def backward(self, in_gradient, **kwargs):
         return np.array(in_gradient).reshape(self.__in_shape)
-        
-# TRAINABLE LAYERS ######################################################
 
+
+# TRAINABLE LAYERS ######################################################
 class Dense(Layer):
     def __init__(self, nodes, input_dim=None, weight_initialization="in_dim"):
         super().__init__()
@@ -172,9 +172,11 @@ class Dense(Layer):
 
 
 class Conv2D(Layer):
-    def __init__(self, num_filters = 5, kernel_shape = (5, 5), input_shape=None):
+    def __init__(self, num_filters = 5, kernel_shape = (5, 5), stride = 1, input_shape=None):
+        super().__init__()
         self.num_filters = num_filters
         self.kernel_shape = kernel_shape
+        self.stride = stride  # TODO(oleguer) Implement stride
         if input_shape is not None:
             self.compile(input_shape)  # Only care about channels
 
@@ -214,15 +216,16 @@ class Conv2D(Layer):
     def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
         """ Weight update
         """
-        left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
-        self.filter_gradients = np.zeros(self.filters.shape)  # Save it to compare with numerical (DEBUG)
-        self.bias_gradients = np.average(in_gradient, axis=(0, 1, 3))
-
+        # Get shapes
         (out_h, out_w, _, _) = in_gradient.shape
         (ker_h, ker_w) = self.kernel_shape
-
         assert(out_h == self.output_shape[0])  # Incoming gradient shape must match layer output shape
         assert(out_w == self.output_shape[1])  # Incoming gradient shape must match layer output shape
+
+        # Instantiate gradients
+        left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
+        self.filter_gradients = np.zeros(self.filters.shape)  # Save it to compare with numerical (DEBUG)
+        self.bias_gradients = np.average(np.sum(in_gradient, axis=(0, 1,)), axis=-1)
 
         for i in range(out_h):
             for j in range(out_w):
@@ -240,7 +243,8 @@ class Conv2D(Layer):
 
     def __initialize_weights(self):
         self.filters = []
-        self.biases = np.zeros(self.num_filters)
+        self.biases = np.random.normal(0.0, 1./100., self.num_filters)
+        # self.biases = np.zeros(self.num_filters)
         full_kernel_shape = self.kernel_shape + (self.input_shape[2],)
         # self.biases = np.array([0, 1])
         for i in range(self.num_filters):
