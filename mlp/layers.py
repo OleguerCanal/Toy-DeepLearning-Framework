@@ -34,7 +34,7 @@ class Layer(ABC):
         input_shape = input_shape if type(input_shape) is tuple else (input_shape, )
         self.input_shape = input_shape
         self.is_compiled = True
-        # print("compiled")
+        print("compiled")
 
     @abstractmethod
     def __call__(self, inputs):
@@ -237,8 +237,8 @@ class Conv2D(Layer):
                 left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] +=\
                     np.einsum("kijc,kn->ijcn", self.filters, grad_block)
 
-        self.filters += lr*self.filter_gradients  #TODO(oleguer): Add momentum and regularization
-        self.biases += lr*self.bias_gradients
+        self.filters -= lr*self.filter_gradients  #TODO(oleguer): Add momentum and regularization
+        self.biases -= lr*self.bias_gradients
         return left_layer_gradient
 
     def __initialize_weights(self):
@@ -254,3 +254,10 @@ class Conv2D(Layer):
                 kernel = np.expand_dims(kernel, axis=2)
             self.filters.append(kernel)
         self.filters = np.array(self.filters)
+
+    def show_filters(self):
+        import matplotlib.pyplot as plt
+        fig, axes = plt.subplots(self.filters.shape[0])
+        for i in range(self.filters.shape[0]):
+            axes[i].imshow(self.filters[i][:, :, 0])
+        plt.show()

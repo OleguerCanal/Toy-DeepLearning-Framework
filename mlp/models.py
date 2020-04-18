@@ -89,6 +89,7 @@ class Sequential:
         self.lr = lr
         self.momentum = momentum
         self.l2_reg = l2_reg
+        self.train_metric = 0
         self.val_metric = 0
         self.t = 0
 
@@ -102,9 +103,12 @@ class Sequential:
         for self.epoch in pbar:
         # for self.epoch in range(self.epochs):
             for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch):
+                # print("forward")
                 Y_pred_prob = self.predict(X_minibatch)  # Forward pass
+                # print("loss")
                 gradient = self.loss.backward(
                     Y_pred_prob, Y_minibatch)  # Loss grad
+                # print("backward")
                 for layer in reversed(self.layers):  # Backprop (chain rule)
                     gradient = layer.backward(
                         in_gradient=gradient,
@@ -122,7 +126,7 @@ class Sequential:
             for callback in callbacks:
                 callback.on_epoch_end(self)
             # Update progressbar
-            pbar.set_description("Val acc: " + str(self.val_metric))
+            pbar.set_description("Train acc: " + str(self.train_metric) + ". Val acc: " + str(self.val_metric))
             if stop:
                 break
 

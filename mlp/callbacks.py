@@ -63,6 +63,7 @@ class MetricTracker(Callback):
         self.val_metrics.append(val_metric)
         self.learning_rates.append(model.lr)
         model.val_metric = val_metric
+        model.train_metric = train_metric
 
     def plot_training_progress(self, show=True, save=False, name="model_results", subtitle=None):
         fig, ax1 = plt.subplots()
