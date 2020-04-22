@@ -225,14 +225,13 @@ class Conv2D(Layer):
         # Instantiate gradients
         left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
         self.filter_gradients = np.zeros(self.filters.shape)  # Save it to compare with numerical (DEBUG)
-        self.bias_gradients = np.sum(np.sum(in_gradient, axis=(0, 1,)), axis=-1)
+        self.bias_gradients = np.sum(in_gradient, axis=(0, 1, 3))
 
         for i in range(out_h):
             for j in range(out_w):
                 in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
                 grad_block = in_gradient[i, j, :, :]
-                filter_grad = np.sum(\
-                    np.einsum("ijcn,kn->kijcn", in_block, grad_block), axis=-1)
+                filter_grad = np.einsum("ijcn,kn->kijc", in_block, grad_block)
                 self.filter_gradients += filter_grad
                 left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] +=\
                     np.einsum("kijc,kn->ijcn", self.filters, grad_block)
