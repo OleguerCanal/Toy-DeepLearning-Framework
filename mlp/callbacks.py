@@ -70,7 +70,7 @@ class MetricTracker(Callback):
         # Losses
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
-        ax1.set_ylim(bottom=np.nanmin(self.val_losses)/2)
+        ax1.set_ylim(bottom=0)
         ax1.set_ylim(top=1.25*np.nanmax(self.val_losses))
         if len(self.val_losses) > 0:
             ax1.plot(list(range(len(self.val_losses))),
