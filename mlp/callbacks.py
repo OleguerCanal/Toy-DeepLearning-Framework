@@ -43,15 +43,15 @@ class MetricTracker(Callback):
 
     def on_training_begin(self, model):
         self.metric_name = model.metric.name
-        self.__track(model)
+        # self.__track(model)
 
     def on_batch_end(self, model):
-        # self.learning_rates.append(model.lr)
         # self.__track(model)
         pass
 
     def on_epoch_end(self, model):
         self.__track(model)
+        self.save("models/tracker")
         pass
 
     def __track(self, model):
@@ -136,8 +136,11 @@ class MetricTracker(Callback):
             plt.show()
 
     def save(self, file):
-        np.save(file + "_lr", self.learning_rates)
-        np.save(file + "_acc", self.train_metrics)
+        # np.save(file + "_lr", self.learning_rates)
+        np.save(file + "_train_met", self.train_metrics)
+        np.save(file + "_val_met", self.val_metrics)
+        np.save(file + "_train_loss", self.train_losses)
+        np.save(file + "_val_loss", self.val_losses)
 
 
 class BestModelSaver(Callback):
@@ -150,7 +153,7 @@ class BestModelSaver(Callback):
         self.best_model_loss = None
         self.best_model_metric = None
 
-    def on_batch_end(self, model):
+    def on_epoch_end(self, model):
         val_metric = model.get_metric_loss(model.X_val, model.Y_val)[0]
         if val_metric >= self.best_metric:
             self.best_metric = model.val_metric

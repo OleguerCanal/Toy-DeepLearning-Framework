@@ -1,8 +1,10 @@
 # Deep Learning Framework Playground
 
-Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend (using hand-written gradients) and MatPlotLib for plotting.
+Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend (using hand-written gradients) and MatPlotLib for plotting. For efficient multithreaded Einstein summation between tensors I use [einsum2 repo](https://github.com/jackkamm/einsum2).
 
-As all my other repos, this is more an exercise for me to make sure I understand the main Deep Learning architectures and algorithms, rather than useful code to fit models. Hope this (super) simplified "Keras" re-implementation also helps you understand them!
+As all my other repos, this is more an exercise for me to make sure I understand the main Deep Learning architectures and algorithms, rather than useful code to fit models. 
+As well as a way to think of (relatively) efficient implementation of them.
+Hope this (super) simplified "Keras" re-implementation also helps you understand them!
 
 # Architectures:
 
@@ -12,13 +14,13 @@ Allows to Build, Train and Assess a modular Multi-Layer-Perceptron Squential arc
 The model (as for now) presents the following features:
 
 - **Layers:**
-    - Trainable: Dense
+    - Trainable: Dense, Conv2D
     - Activation: Relu, Softmax
     - Regularization: Dropout
 - **Losses:**
     - CrossEntropy
     - CategoricalHinge
-- **Optimizer:** Minibatch Gradient Descent BackProp Training with customizable:
+- **Optimization:** Minibatch Gradient Descent BackProp Training with customizable:
     - Batch Size
     - Epochs / Iterations
     - Momentum
@@ -125,3 +127,9 @@ Example of Gaussian Process Regression Optimizer hyperparameter analysis:
 ![Gaussian Process Regression Optimizer Analysis](https://github.com/OleguerCanal/KTH_DeepLearning/blob/master/Assignment_2/metaparam_search/evaluations.csv_objective_plot.png)
 
 
+# Installation
+
+`pip install -r requirements.txt`
+
+[OPTIONAL]
+To parallelize Einstein sumations between tensors install [einsum](https://github.com/jackkamm/einsum2), if not found will use numpy single-thread version instead.

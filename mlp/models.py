@@ -44,9 +44,10 @@ class Sequential:
         return vals
 
     def get_metric_loss(self, X, Y_real, use_dropout=True):
-        """ Returns loss and classification accuracy """
+        """ Returns loss and value of success metric
+        """
         if X is None or Y_real is None:
-            print("problem")
+            print("Attempting to get metrics of None")
             return 0, np.inf
         Y_pred_prob = self.predict(X, use_dropout)
         metric_val = 0
@@ -103,18 +104,23 @@ class Sequential:
         for self.epoch in pbar:
         # for self.epoch in range(self.epochs):
             for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch):
-                # print("forward")
-                Y_pred_prob = self.predict(X_minibatch)  # Forward pass
-                # print("loss")
+                # t = time.time()
+                self.Y_pred_prob = self.predict(X_minibatch)  # Forward pass
+                # print("forward_time:", time.time()-t)
+                # t = time.time()
                 gradient = self.loss.backward(
-                    Y_pred_prob, Y_minibatch)  # Loss grad
+                    self.Y_pred_prob, Y_minibatch)  # Loss grad
+                # print("loss_backward_time:", time.time()-t)
                 # print("backward")
                 for layer in reversed(self.layers):  # Backprop (chain rule)
+                    # t = time.time()
                     gradient = layer.backward(
                         in_gradient=gradient,
                         lr=self.lr,  # Trainable layer parameters
                         momentum=self.momentum,
                         l2_regularization=self.l2_reg)
+                    # print("gradient_time:", layer, time.time()-t)
+                # t = time.time()
                 # Call callbacks
                 for callback in callbacks:
                     callback.on_batch_end(self)
@@ -122,9 +128,13 @@ class Sequential:
                     stop = True
                     break
                 self.t += 1  # Step counter
+                # print("batch_callbacks_time:", layer, time.time()-t)
+            # t = time.time()
             # Call callbacks
             for callback in callbacks:
                 callback.on_epoch_end(self)
+            # print("epoch_callbacks_time:", layer, time.time()-t)
+
             # Update progressbar
             pbar.set_description("Train acc: " + str(self.train_metric) + ". Val acc: " + str(self.val_metric))
             if stop:

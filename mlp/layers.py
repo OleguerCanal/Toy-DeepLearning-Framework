@@ -2,6 +2,12 @@ from abc import ABC, abstractmethod
 import copy
 import numpy as np
 
+try:  # If installed try to use parallelized einsum
+    from einsum2 import einsum2 as einsum
+except:
+    print("Did not find einsum2, using numpy einsum (SLOWER)")
+    from numpy import einsum as einsum
+
 # Layer Templates #######################################################
 class Layer(ABC):
     """ Abstact class to represent Layers
@@ -207,10 +213,11 @@ class Conv2D(Layer):
         output = np.empty(shape = self.output_shape + (self.inputs.shape[3],))
         for i in range(out_h):
             for j in range(out_w):
-                output[i, j, :, :] = np.einsum("ijcn,kijc->kn",\
+                output[i, j, :, :] = einsum("ijcn,kijc->kn",\
                      inputs[i:i+ker_h, j:j+ker_w, :, :], self.filters)
+        
         # Add biases
-        output += np.einsum("ijcn,c->ijcn", np.ones(output.shape), self.biases)
+        output += einsum("ijcn,c->ijcn", np.ones(output.shape), self.biases)
         return output
 
     def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
@@ -231,10 +238,10 @@ class Conv2D(Layer):
             for j in range(out_w):
                 in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
                 grad_block = in_gradient[i, j, :, :]
-                filter_grad = np.einsum("ijcn,kn->kijc", in_block, grad_block)
+                filter_grad = einsum("ijcn,kn->kijc", in_block, grad_block)
                 self.filter_gradients += filter_grad
                 left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] +=\
-                    np.einsum("kijc,kn->ijcn", self.filters, grad_block)
+                    einsum("kijc,kn->ijcn", self.filters, grad_block)
 
         self.dw = momentum*self.dw + (1-momentum)*self.filter_gradients
         self.filters -= lr*self.dw  #TODO(oleguer): Add regularization
