@@ -34,7 +34,7 @@ class Layer(ABC):
         input_shape = input_shape if type(input_shape) is tuple else (input_shape, )
         self.input_shape = input_shape
         self.is_compiled = True
-        print("compiled")
+        # print("compiled")
 
     @abstractmethod
     def __call__(self, inputs):
@@ -225,19 +225,20 @@ class Conv2D(Layer):
         # Instantiate gradients
         left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
         self.filter_gradients = np.zeros(self.filters.shape)  # Save it to compare with numerical (DEBUG)
-        self.bias_gradients = np.average(np.sum(in_gradient, axis=(0, 1,)), axis=-1)
+        self.bias_gradients = np.sum(np.sum(in_gradient, axis=(0, 1,)), axis=-1)
 
         for i in range(out_h):
             for j in range(out_w):
                 in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
                 grad_block = in_gradient[i, j, :, :]
-                filter_grad = np.average(\
-                    np.einsum("ijcn,kn->ijckn", in_block, grad_block), axis=-1)
-                self.filter_gradients += np.moveaxis(filter_grad, -1, 0)  # First axis is the filter
+                filter_grad = np.sum(\
+                    np.einsum("ijcn,kn->kijcn", in_block, grad_block), axis=-1)
+                self.filter_gradients += filter_grad
                 left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] +=\
                     np.einsum("kijc,kn->ijcn", self.filters, grad_block)
 
-        self.filters -= lr*self.filter_gradients  #TODO(oleguer): Add momentum and regularization
+        self.dw = momentum*self.dw + (1-momentum)*self.filter_gradients
+        self.filters -= lr*self.dw  #TODO(oleguer): Add regularization
         self.biases -= lr*self.bias_gradients
         return left_layer_gradient
 
@@ -254,6 +255,7 @@ class Conv2D(Layer):
                 kernel = np.expand_dims(kernel, axis=2)
             self.filters.append(kernel)
         self.filters = np.array(self.filters)
+        self.dw = 0
 
     def show_filters(self):
         import matplotlib.pyplot as plt
