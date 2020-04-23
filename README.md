@@ -1,6 +1,6 @@
 # Deep Learning Framework Playground
 
-Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend (using hand-written gradients) and MatPlotLib for plotting. For efficient multithreaded Einstein summation between tensors I use [einsum2 repo](https://github.com/jackkamm/einsum2).
+Simple Keras-inspired Deep Learning Framework implemented in Python with Numpy backend (using hand-written gradients) and Matplotlib plotting. For efficient (multithreaded) Einstein summation between tensors I use [einsum2 repo](https://github.com/jackkamm/einsum2).
 
 As all my other repos, this is more an exercise for me to make sure I understand the main Deep Learning architectures and algorithms, rather than useful code to fit models. 
 As well as a way to think of (relatively) efficient implementation of them.

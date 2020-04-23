@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import copy
 import numpy as np
+import time
 
 try:  # If installed try to use parallelized einsum
     from einsum2 import einsum2 as einsum
@@ -121,6 +122,94 @@ class Flatten(Layer):
     def backward(self, in_gradient, **kwargs):
         return np.array(in_gradient).reshape(self.__in_shape)
 
+
+class MaxPool2D(Layer):
+    def __init__(self, kernel_shape = (2, 2), stride = 1, input_shape=None):
+        super().__init__()
+        self.kernel_shape = kernel_shape
+        self.stride = stride  # TODO(oleguer) Implement stride
+        if input_shape is not None:
+            self.compile(input_shape)  # Only care about channels
+
+    def compile(self, input_shape):
+        assert(len(input_shape) == 3) # Input shape must be (height, width, channels,)
+        super().compile(input_shape)
+        (ker_h, ker_w) = self.kernel_shape
+        out_h = input_shape[0] - ker_h + 1
+        out_w = input_shape[1] - ker_w + 1
+        self.output_shape = (out_h, out_w, input_shape[2],)
+
+    def __call__(self, inputs):
+        """ Forward pass of MaxPool2D
+            input should have shape (height, width, channels, n_images)
+        """
+        assert(len(inputs.shape) == 4) # Input must have shape (height, width, channels, n_images)
+        assert(inputs.shape[:3] == self.input_shape)  # Set input shape does not match with input sent
+
+        # Get shapes
+        (ker_h, ker_w) = self.kernel_shape
+        (out_h, out_w, _,) = self.output_shape
+
+        # Compute convolution
+        self.inputs = inputs  # Will be used in back pass
+        output = np.empty(shape = self.output_shape + (self.inputs.shape[3],))
+        for i in range(out_h):
+            for j in range(out_w):
+                # TODO(oleguer): Not sure if np.amax is parallel, look into  numexpr
+                output[i, j, :, :] = np.amax(inputs[i:i+ker_h, j:j+ker_w, :, :], axis=(0, 1,))
+        return output
+
+    def backward(self, in_gradient, **kwargs):
+        """ Pass gradient to left layer """
+        # Get shapes
+        (out_h, out_w, n_channels, n_points) = in_gradient.shape
+        (ker_h, ker_w) = self.kernel_shape
+        
+        assert(out_h == self.output_shape[0])  # Incoming gradient shape must match layer output shape
+        assert(out_w == self.output_shape[1])  # Incoming gradient shape must match layer output shape
+
+        # Instantiate gradients
+        left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
+
+        for i in range(out_h):
+            for j in range(out_w):
+                # for c in range(n_channels):
+                    # for n in range(n_points):
+                in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
+                mask = np.equal(in_block, np.amax(in_block, axis=(0, 1,))).astype(int)
+                cosa = mask*in_gradient[i, j, :, :]
+                    # idx = np.argmax(np.reshape(self.inputs[i:i+ker_h, j:j+ker_w, c, n], ker_h*ker_w))
+                    # print(idx)
+                    # idxs = np.unravel_index(idx, (ker_h, ker_w))
+                    # print(idxs)
+                    # left_layer_gradient[i+idxs[0], j+idxs[1], c, n] += in_gradient[i, j, c, n]
+                    # left_layer_gradient[i+idxs[0], j+idxs[1], c, n] += in_gradient[i, j, c, n]
+                left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] += cosa
+
+                # mask = np.equal(self.inputs[i:i+ker_h, j:j+ker_w, :, :], np.amax(self.inputs[i:i+ker_h, j:j+ker_w, :, :], axis=(0, 1,))).astype(int)
+                # # print(mask.shape)
+                # # result = einsum("ijcn,cn->ijcn", mask, in_gradient[i, j, :, :])
+                # # indx = np.argmax(self.inputs[i:i+ker_h, j:j+ker_w, :, :], axis=(0, 1,))
+                # # repeated = np.expand_dims(in_gradient[i, j, :, :], 0)
+                # # repeated = np.repeat(repeated, ker_h, axis=0)
+                # # repeated = np.expand_dims(repeated, 0)
+                # # repeated = np.repeat(repeated, ker_w, axis=0)
+                # # # print(repeated.shape)
+
+                # # a = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
+                # # b = a.reshape((a.shape[0]*a.shape[1], a.shape[2], a.shape[3]))
+                # # indx = np.argmax(b, axis=0)
+                # # c = np.array(np.unravel_index(indx, (a.shape[0], a.shape[1]))).astype(int)
+                # # d = np.zeros(self.inputs[i:i+ker_h, j:j+ker_w, :, :].shape)
+                # # d[c[0, :, :], c[1, :, :], :, :] = in_gradient[i, j, :, :]
+                # repeated = np.expand_dims(in_gradient[i, j, :, :], axis=(0, 1,))
+                # # repeated = np.expand_dims(repeated, axis=0)
+                # # print(repeated.shape)
+                # repeated = in_gradient[i:i+1, j:j+1, :, :].repeat(ker_h, axis=0).repeat(ker_w, axis=1)
+                # print(repeated.shape)
+
+                # left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] += mask*repeated
+        return left_layer_gradient
 
 # TRAINABLE LAYERS ######################################################
 class Dense(Layer):

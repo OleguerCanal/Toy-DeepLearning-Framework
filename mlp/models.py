@@ -113,13 +113,13 @@ class Sequential:
                 # print("loss_backward_time:", time.time()-t)
                 # print("backward")
                 for layer in reversed(self.layers):  # Backprop (chain rule)
-                    # t = time.time()
+                    t = time.time()
                     gradient = layer.backward(
                         in_gradient=gradient,
                         lr=self.lr,  # Trainable layer parameters
                         momentum=self.momentum,
                         l2_regularization=self.l2_reg)
-                    # print("gradient_time:", layer, time.time()-t)
+                    print("gradient_time:", layer, time.time()-t)
                 # t = time.time()
                 # Call callbacks
                 for callback in callbacks:
