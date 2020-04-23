@@ -173,42 +173,10 @@ class MaxPool2D(Layer):
 
         for i in range(out_h):
             for j in range(out_w):
-                # for c in range(n_channels):
-                    # for n in range(n_points):
                 in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
                 mask = np.equal(in_block, np.amax(in_block, axis=(0, 1,))).astype(int)
-                cosa = mask*in_gradient[i, j, :, :]
-                    # idx = np.argmax(np.reshape(self.inputs[i:i+ker_h, j:j+ker_w, c, n], ker_h*ker_w))
-                    # print(idx)
-                    # idxs = np.unravel_index(idx, (ker_h, ker_w))
-                    # print(idxs)
-                    # left_layer_gradient[i+idxs[0], j+idxs[1], c, n] += in_gradient[i, j, c, n]
-                    # left_layer_gradient[i+idxs[0], j+idxs[1], c, n] += in_gradient[i, j, c, n]
-                left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] += cosa
-
-                # mask = np.equal(self.inputs[i:i+ker_h, j:j+ker_w, :, :], np.amax(self.inputs[i:i+ker_h, j:j+ker_w, :, :], axis=(0, 1,))).astype(int)
-                # # print(mask.shape)
-                # # result = einsum("ijcn,cn->ijcn", mask, in_gradient[i, j, :, :])
-                # # indx = np.argmax(self.inputs[i:i+ker_h, j:j+ker_w, :, :], axis=(0, 1,))
-                # # repeated = np.expand_dims(in_gradient[i, j, :, :], 0)
-                # # repeated = np.repeat(repeated, ker_h, axis=0)
-                # # repeated = np.expand_dims(repeated, 0)
-                # # repeated = np.repeat(repeated, ker_w, axis=0)
-                # # # print(repeated.shape)
-
-                # # a = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
-                # # b = a.reshape((a.shape[0]*a.shape[1], a.shape[2], a.shape[3]))
-                # # indx = np.argmax(b, axis=0)
-                # # c = np.array(np.unravel_index(indx, (a.shape[0], a.shape[1]))).astype(int)
-                # # d = np.zeros(self.inputs[i:i+ker_h, j:j+ker_w, :, :].shape)
-                # # d[c[0, :, :], c[1, :, :], :, :] = in_gradient[i, j, :, :]
-                # repeated = np.expand_dims(in_gradient[i, j, :, :], axis=(0, 1,))
-                # # repeated = np.expand_dims(repeated, axis=0)
-                # # print(repeated.shape)
-                # repeated = in_gradient[i:i+1, j:j+1, :, :].repeat(ker_h, axis=0).repeat(ker_w, axis=1)
-                # print(repeated.shape)
-
-                # left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] += mask*repeated
+                masked_gradient = mask*in_gradient[i, j, :, :]
+                left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] += masked_gradient
         return left_layer_gradient
 
 # TRAINABLE LAYERS ######################################################
