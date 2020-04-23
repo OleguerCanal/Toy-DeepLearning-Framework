@@ -170,7 +170,6 @@ class MaxPool2D(Layer):
 
         # Instantiate gradients
         left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
-
         for i in range(out_h):
             for j in range(out_w):
                 in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]

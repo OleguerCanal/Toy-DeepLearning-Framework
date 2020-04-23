@@ -16,7 +16,7 @@ The model (as for now) presents the following features:
 - **Layers:**
     - Trainable: Dense, Conv2D
     - Activation: Relu, Softmax
-    - Regularization: Dropout
+    - Regularization: Dropout, MaxPool2D
 - **Losses:**
     - CrossEntropy
     - CategoricalHinge
