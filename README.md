@@ -127,9 +127,15 @@ Example of Gaussian Process Regression Optimizer hyperparameter analysis:
 ![Gaussian Process Regression Optimizer Analysis](https://github.com/OleguerCanal/KTH_DeepLearning/blob/master/Assignment_2/metaparam_search/evaluations.csv_objective_plot.png)
 
 
-# Installation
+# Usage
+
+Clone repo and install requirements:
+
+`git clone https://github.com/OleguerCanal/Toy-DeepLearning-Framework.git`
+
+`cd Toy-DeepLearning-Framework`
 
 `pip install -r requirements.txt`
 
 [OPTIONAL]
-To parallelize Einstein sumations between tensors install [einsum](https://github.com/jackkamm/einsum2), if not found will use numpy single-thread version instead.
+To parallelize Einstein sumations between tensors install [einsum2](https://github.com/jackkamm/einsum2), if not found will use numpy single-thread version instead (SLOWER).
