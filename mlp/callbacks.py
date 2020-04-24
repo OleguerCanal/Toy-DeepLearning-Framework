@@ -9,7 +9,6 @@ import os
 sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
 from models import Sequential
 
-
 class Callback(ABC):
     """ Abstract class to hold callbacks
     """
@@ -64,6 +63,7 @@ class MetricTracker(Callback):
         self.learning_rates.append(model.lr)
         model.val_metric = val_metric
         model.train_metric = train_metric
+        model.train_loss = train_loss
 
     def plot_training_progress(self, show=True, save=False, name="model_results", subtitle=None):
         fig, ax1 = plt.subplots()
