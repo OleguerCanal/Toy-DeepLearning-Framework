@@ -218,16 +218,16 @@ class Dense(Layer):
 
     def __initialize_weights(self, weight_initialization):
         if weight_initialization == "normal":
-            self.weights = np.matrix(np.random.normal(
+            self.weights = np.array(np.random.normal(
                 0.0, 1./100.,
                                     (self.nodes, self.input_shape[0]+1)))  # Add biases
         if weight_initialization == "in_dim":
-            self.weights = np.matrix(np.random.normal(
+            self.weights = np.array(np.random.normal(
                 0.0, 1./float(np.sqrt(self.input_shape[0])),
                 (self.nodes, self.input_shape[0]+1)))  # Add biases
         if weight_initialization == "xavier":
             limit = np.sqrt(6/(self.nodes+self.input_shape[0]))
-            self.weights = np.matrix(np.random.uniform(
+            self.weights = np.array(np.random.uniform(
                 low=-limit,
                 high=limit,
                 size=(self.nodes, self.input_shape[0]+1)))  # Add biases
