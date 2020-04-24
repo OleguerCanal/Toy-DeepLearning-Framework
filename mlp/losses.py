@@ -1,6 +1,12 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+try:  # If installed try to use parallelized einsum
+    from einsum2 import einsum2 as einsum
+except:
+    print("Did not find einsum2, using numpy einsum (SLOWER)")
+    from numpy import einsum as einsum
+
 
 class Loss(ABC):
     """ Abstact class to represent Loss functions
@@ -25,18 +31,32 @@ class Loss(ABC):
 # LOSSES IMPLEMNETATIONS  #########################################
 
 class CrossEntropy(Loss):
+    def __init__(self, class_count=None):
+        self._EPS = 1e-5
+        self.classes_counts = class_count
+        
     def __call__(self, Y_pred, Y_real):
-        return -np.sum(np.log(np.sum(np.multiply(Y_pred, Y_real), axis=0)))/float(Y_pred.shape[1])
+        proportion_compensation = np.ones(Y_real.shape[-1])
+        if self.classes_counts is not None:
+            proportion_compensation = np.dot(Y_real.T, self.classes_counts)
+
+        logs = np.log(np.sum(np.multiply(Y_pred, Y_real), axis=0))
+        prod = np.dot(logs, proportion_compensation)
+        return -prod/float(Y_pred.shape[1])
 
     def backward(self, Y_pred, Y_real):
+        proportion_compensation = np.ones(Y_real.shape[-1])
+        if self.classes_counts is not None:
+            proportion_compensation = np.dot(Y_real.T, self.classes_counts)
         # d(-log(x))/dx = -1/x
         f_y = np.multiply(Y_real, Y_pred)
         # Element-wise inverse
         loss_diff = - \
             np.reciprocal(f_y, out=np.zeros_like(
                 Y_pred), where=abs(f_y) > self._EPS)
+        # Account for class imbalance
+        loss_diff = loss_diff*proportion_compensation
         return loss_diff/float(Y_pred.shape[1])
-
 
 class CategoricalHinge(Loss):
     def __call__(self, Y_pred, Y_real):
