@@ -32,6 +32,8 @@ class Sequential:
             assert(self.layers[-2].is_compiled)  # Input/Output shapes not set for previous layer!
             # Set input shape to be previous layer output_shape
             self.layers[-1].compile(input_shape=self.layers[-2].output_shape)
+        # print(layer.input_shape)
+        # print(layer.output_shape)
 
     def predict(self, X, apply_dropout=True):
         """Forward pass"""
@@ -69,7 +71,7 @@ class Sequential:
 
     def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=None,
             iterations = None, lr=0.01, momentum=0.7, l2_reg=0.1,
-            shuffle_minibatch=True, callbacks=[], **kwargs):
+            shuffle_minibatch=True, compensate=False, callbacks=[], **kwargs):
         """ Performs backrpop with given parameters.
             save_path is where model of best val accuracy will be saved
         """
@@ -92,6 +94,8 @@ class Sequential:
         self.l2_reg = l2_reg
         self.train_metric = 0
         self.val_metric = 0
+        self.train_loss = 0
+        self.val_loss = 0
         self.t = 0
 
         # Call callbacks
@@ -103,7 +107,7 @@ class Sequential:
         pbar = tqdm(list(range(self.epochs)))
         for self.epoch in pbar:
         # for self.epoch in range(self.epochs):
-            for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch):
+            for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch, compensate):
                 # t = time.time()
                 self.Y_pred_prob = self.predict(X_minibatch)  # Forward pass
                 # print("forward_time:", time.time()-t)
@@ -113,13 +117,13 @@ class Sequential:
                 # print("loss_backward_time:", time.time()-t)
                 # print("backward")
                 for layer in reversed(self.layers):  # Backprop (chain rule)
-                    t = time.time()
+                    # t = time.time()
                     gradient = layer.backward(
                         in_gradient=gradient,
                         lr=self.lr,  # Trainable layer parameters
                         momentum=self.momentum,
                         l2_regularization=self.l2_reg)
-                    print("gradient_time:", layer, time.time()-t)
+                    # print("gradient_time:", layer, time.time()-t)
                 # t = time.time()
                 # Call callbacks
                 for callback in callbacks:
@@ -136,7 +140,9 @@ class Sequential:
             # print("epoch_callbacks_time:", layer, time.time()-t)
 
             # Update progressbar
-            pbar.set_description("Train acc: " + str(self.train_metric) + ". Val acc: " + str(self.val_metric))
+            pbar.set_description("Train acc: " + str(np.round(self.train_metric*100, 2)) +\
+                                 "% Val acc: " + str(np.round(self.val_metric*100, 2)) +\
+                                 "% Train Loss: " + str(np.round(self.train_loss)))
             if stop:
                 break
 
