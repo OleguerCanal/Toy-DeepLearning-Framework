@@ -54,3 +54,21 @@ def minibatch_split(X, Y, batch_size, shuffle=True, compansate=False):
 		for i in range(int(n/batch_size)):
 			indxs = np.random.choice(range(n), size=batch_size, replace=True, p=x_probas)
 			yield X[..., indxs], Y[..., indxs]
+
+def plot_confusion_matrix(Y_pred, Y_real, class_names, path=None):
+	heatmap = np.zeros((Y_pred.shape[0], Y_pred.shape[0]))
+	for n in range(Y_pred.shape[-1]):
+		i = np.where(Y_pred[:, n]==1)[0][0]
+		j = np.where(Y_real[:, n]==1)[0][0]
+		heatmap[i, j] += 1
+		
+	import seaborn as sn
+	import pandas as pd
+	
+	df_cm = pd.DataFrame(heatmap, index = [i for i in class_names],
+								  columns = [i for i in class_names])
+	plt.figure(figsize = (10,10))
+	sn.heatmap(df_cm, robust=True, square=True,annot=True, fmt='g')
+	if path is not None:
+		plt.savefig(path)
+	plt.show()

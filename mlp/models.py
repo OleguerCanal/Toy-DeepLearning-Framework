@@ -45,6 +45,13 @@ class Sequential:
                 vals = layer(vals)
         return vals
 
+    def predict_classes(self, X):
+        Y_pred_prob = self.predict(X, apply_dropout=False)
+        idx = np.argmax(Y_pred_prob, axis=0)
+        Y_pred_class = np.zeros(Y_pred_prob.shape)
+        Y_pred_class[idx, np.arange(Y_pred_class.shape[1])] = 1
+        return Y_pred_class
+
     def get_metric_loss(self, X, Y_real, use_dropout=True):
         """ Returns loss and value of success metric
         """
@@ -145,7 +152,6 @@ class Sequential:
                                  "% Train Loss: " + str(np.round(self.train_loss)))
             if stop:
                 break
-
 
     # IO functions ################################################
     def save(self, path):
