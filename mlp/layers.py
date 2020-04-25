@@ -154,8 +154,10 @@ class MaxPool2D(Layer):
         """ Forward pass of MaxPool2D
             input should have shape (height, width, channels, n_images)
         """
-        assert(len(inputs.shape) == 4)  # Input must have shape (height, width, channels, n_images)
-        assert(inputs.shape[:3] == self.input_shape)  # Set input shape does not match with input sent
+        assert(len(inputs.shape) ==
+               4)  # Input must have shape (height, width, channels, n_images)
+        # Set input shape does not match with input sent
+        assert(inputs.shape[:3] == self.input_shape)
 
         # Get shapes
         (ker_h, ker_w) = self.kernel_shape
@@ -167,7 +169,8 @@ class MaxPool2D(Layer):
         for i in range(out_h):
             for j in range(out_w):
                 # TODO(oleguer): Not sure if np.amax is parallel, look into  numexpr
-                in_block = self.inputs[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :]
+                in_block = self.inputs[self.s*i:self.s *
+                                       i+ker_h, self.s*j:self.s*j+ker_w, :, :]
                 output[i, j, :, :] = np.amax(in_block, axis=(0, 1,))
         return output
 
@@ -187,11 +190,13 @@ class MaxPool2D(Layer):
             self.input_shape + (in_gradient.shape[-1],))
         for i in range(out_h):
             for j in range(out_w):
-                in_block = self.inputs[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :]
+                in_block = self.inputs[self.s*i:self.s *
+                                       i+ker_h, self.s*j:self.s*j+ker_w, :, :]
                 mask = np.equal(in_block, np.amax(
                     in_block, axis=(0, 1,))).astype(int)
                 masked_gradient = mask*in_gradient[i, j, :, :]
-                left_layer_gradient[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :] += masked_gradient
+                left_layer_gradient[self.s*i:self.s*i+ker_h,
+                                    self.s*j:self.s*j+ker_w, :, :] += masked_gradient
         return left_layer_gradient
 
 # TRAINABLE LAYERS ######################################################
@@ -253,11 +258,15 @@ class Dense(Layer):
 
 
 class Conv2D(Layer):
-    def __init__(self, num_filters=5, kernel_shape=(5, 5), stride=1, input_shape=None):
+    def __init__(self, num_filters=5, kernel_shape=(5, 5), stride=1, dilation_rate=1, input_shape=None):
         super().__init__()
         self.num_filters = num_filters
-        self.kernel_shape = kernel_shape
         self.s = stride
+        self.dilation = dilation_rate
+        self.kernel_shape = kernel_shape
+        aug_ker_h = (self.kernel_shape[0]-1)*self.dilation + 1
+        aug_ker_w = (self.kernel_shape[1]-1)*self.dilation + 1
+        self.aug_kernel_shape = (aug_ker_h, aug_ker_w)  # Kernel size considering dilation_rate
         if input_shape is not None:
             self.compile(input_shape)  # Only care about channels
 
@@ -265,7 +274,7 @@ class Conv2D(Layer):
         # Input shape must be (height, width, channels,)
         assert(len(input_shape) == 3)
         super().compile(input_shape)
-        (ker_h, ker_w) = self.kernel_shape
+        (ker_h, ker_w) = self.aug_kernel_shape
         out_h = int((input_shape[0] - ker_h)/self.s) + 1
         out_w = int((input_shape[1] - ker_w)/self.s) + 1
         self.output_shape = (out_h, out_w, self.num_filters,)
@@ -277,11 +286,13 @@ class Conv2D(Layer):
             channels should match kernel_shape
         """
         assert(len(inputs.shape) == 4)  # Input (height, width, channels, n_images)
-        assert(inputs.shape[:3] == self.input_shape)  # Set input shape does not match with input sent
-        assert(self.filters.shape[3] == inputs.shape[2])  # Filter number of channels must match input channels
+        # Set input shape does not match with input sent
+        assert(inputs.shape[:3] == self.input_shape)
+        # Filter number of channels must match input channels
+        assert(self.filters.shape[3] == inputs.shape[2])
 
         # Get shapes
-        (ker_h, ker_w) = self.kernel_shape
+        (aug_ker_h, aug_ker_w) = self.aug_kernel_shape
         (out_h, out_w, _,) = self.output_shape
 
         # Compute convolution
@@ -289,8 +300,12 @@ class Conv2D(Layer):
         output = np.empty(shape=self.output_shape + (self.inputs.shape[3],))
         for i in range(out_h):
             for j in range(out_w):
-                in_block = inputs[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :]
-                output[i, j, :, :] = einsum("ijcn,kijc->kn", in_block, self.filters)
+                in_block = inputs[self.s*i:self.s*i+aug_ker_h:self.dilation,
+                                  self.s*j:self.s*j+aug_ker_w:self.dilation, :, :]
+                print(in_block.shape)
+                print(self.filters.shape)
+                output[i, j, :, :] = einsum(
+                    "ijcn,kijc->kn", in_block, self.filters)
 
         # Add biases
         output += einsum("ijcn,c->ijcn", np.ones(output.shape), self.biases)
@@ -301,7 +316,8 @@ class Conv2D(Layer):
         """
         # Get shapes
         (out_h, out_w, _, _) = in_gradient.shape
-        (ker_h, ker_w) = self.kernel_shape
+        (aug_ker_h, aug_ker_w) = self.aug_kernel_shape
+
         # Incoming gradient shape must match layer output shape
         assert(out_h == self.output_shape[0])
         # Incoming gradient shape must match layer output shape
@@ -316,11 +332,13 @@ class Conv2D(Layer):
 
         for i in range(out_h):
             for j in range(out_w):
-                in_block = self.inputs[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :]
+                in_block = self.inputs[self.s*i:self.s*i+aug_ker_h:self.dilation,
+                                       self.s*j:self.s*j+aug_ker_w:self.dilation, :, :]
                 grad_block = in_gradient[i, j, :, :]
                 filter_grad = einsum("ijcn,kn->kijc", in_block, grad_block)
                 self.filter_gradients += filter_grad
-                left_layer_gradient[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :] +=\
+                left_layer_gradient[self.s*i:self.s*i+aug_ker_h:self.dilation,
+                                    self.s*j:self.s*j+aug_ker_w:self.dilation, :, :] +=\
                     einsum("kijc,kn->ijcn", self.filters, grad_block)
 
         self.dw = momentum*self.dw + (1-momentum)*self.filter_gradients
