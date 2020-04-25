@@ -137,7 +137,7 @@ class MaxPool2D(Layer):
     def __init__(self, kernel_shape=(2, 2), stride=1, input_shape=None):
         super().__init__()
         self.kernel_shape = kernel_shape
-        self.stride = stride  # TODO(oleguer) Implement stride
+        self.s = stride  # TODO(oleguer) Implement stride
         if input_shape is not None:
             self.compile(input_shape)  # Only care about channels
 
@@ -146,18 +146,16 @@ class MaxPool2D(Layer):
         assert(len(input_shape) == 3)
         super().compile(input_shape)
         (ker_h, ker_w) = self.kernel_shape
-        out_h = input_shape[0] - ker_h + 1
-        out_w = input_shape[1] - ker_w + 1
+        out_h = int((input_shape[0] - ker_h)/self.s) + 1
+        out_w = int((input_shape[1] - ker_w)/self.s) + 1
         self.output_shape = (out_h, out_w, input_shape[2],)
 
     def __call__(self, inputs):
         """ Forward pass of MaxPool2D
             input should have shape (height, width, channels, n_images)
         """
-        assert(len(inputs.shape) ==
-               4)  # Input must have shape (height, width, channels, n_images)
-        # Set input shape does not match with input sent
-        assert(inputs.shape[:3] == self.input_shape)
+        assert(len(inputs.shape) == 4)  # Input must have shape (height, width, channels, n_images)
+        assert(inputs.shape[:3] == self.input_shape)  # Set input shape does not match with input sent
 
         # Get shapes
         (ker_h, ker_w) = self.kernel_shape
@@ -169,8 +167,8 @@ class MaxPool2D(Layer):
         for i in range(out_h):
             for j in range(out_w):
                 # TODO(oleguer): Not sure if np.amax is parallel, look into  numexpr
-                output[i, j, :, :] = np.amax(
-                    inputs[i:i+ker_h, j:j+ker_w, :, :], axis=(0, 1,))
+                in_block = self.inputs[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :]
+                output[i, j, :, :] = np.amax(in_block, axis=(0, 1,))
         return output
 
     def backward(self, in_gradient, **kwargs):
@@ -189,12 +187,11 @@ class MaxPool2D(Layer):
             self.input_shape + (in_gradient.shape[-1],))
         for i in range(out_h):
             for j in range(out_w):
-                in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
+                in_block = self.inputs[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :]
                 mask = np.equal(in_block, np.amax(
                     in_block, axis=(0, 1,))).astype(int)
                 masked_gradient = mask*in_gradient[i, j, :, :]
-                left_layer_gradient[i:i+ker_h, j:j +
-                                    ker_w, :, :] += masked_gradient
+                left_layer_gradient[self.s*i:self.s*i+ker_h, self.s*j:self.s*j+ker_w, :, :] += masked_gradient
         return left_layer_gradient
 
 # TRAINABLE LAYERS ######################################################
