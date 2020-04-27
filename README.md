@@ -20,7 +20,7 @@ The model (as for now) presents the following features:
 - **Losses:**
     - CrossEntropy
     - CategoricalHinge
-- **Optimization:** Minibatch Gradient Descent BackProp Training with customizable:
+- **Optimization:** Minibatch SGD BackProp Training with customizable:
     - Batch Size
     - Epochs / Iterations
     - Momentum
