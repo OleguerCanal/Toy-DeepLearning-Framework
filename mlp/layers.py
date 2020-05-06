@@ -10,8 +10,6 @@ except:
     from numpy import einsum as einsum
 
 # Layer Templates #######################################################
-
-
 class Layer(ABC):
     """ Abstact class to represent Layers
         A Layer has:
@@ -266,7 +264,8 @@ class Conv2D(Layer):
         self.kernel_shape = kernel_shape
         aug_ker_h = (self.kernel_shape[0]-1)*self.dilation + 1
         aug_ker_w = (self.kernel_shape[1]-1)*self.dilation + 1
-        self.aug_kernel_shape = (aug_ker_h, aug_ker_w)  # Kernel size considering dilation_rate
+        # Kernel size considering dilation_rate
+        self.aug_kernel_shape = (aug_ker_h, aug_ker_w)
         if input_shape is not None:
             self.compile(input_shape)  # Only care about channels
 
@@ -302,8 +301,6 @@ class Conv2D(Layer):
             for j in range(out_w):
                 in_block = inputs[self.s*i:self.s*i+aug_ker_h:self.dilation,
                                   self.s*j:self.s*j+aug_ker_w:self.dilation, :, :]
-                print(in_block.shape)
-                print(self.filters.shape)
                 output[i, j, :, :] = einsum(
                     "ijcn,kijc->kn", in_block, self.filters)
 
@@ -341,7 +338,14 @@ class Conv2D(Layer):
                                     self.s*j:self.s*j+aug_ker_w:self.dilation, :, :] +=\
                     einsum("kijc,kn->ijcn", self.filters, grad_block)
 
-        self.dw = momentum*self.dw + (1-momentum)*self.filter_gradients
+
+        self.filter_gradients += 2*l2_regularization*self.filters
+
+        if np.array_equal(self.dw, np.zeros(self.filters.shape)):
+            self.dw = self.filter_gradients
+        else:
+            self.dw = momentum*self.dw + (1-momentum)*self.filter_gradients
+
         self.filters -= lr*self.dw  # TODO(oleguer): Add regularization
         self.biases -= lr*self.bias_gradients
         return left_layer_gradient
@@ -359,7 +363,7 @@ class Conv2D(Layer):
                 kernel = np.expand_dims(kernel, axis=2)
             self.filters.append(kernel)
         self.filters = np.array(self.filters)
-        self.dw = 0
+        self.dw = np.zeros(self.filters.shape)
 
     def show_filters(self):
         import matplotlib.pyplot as plt
@@ -367,3 +371,47 @@ class Conv2D(Layer):
         for i in range(self.filters.shape[0]):
             axes[i].imshow(self.filters[i][:, :, 0])
         plt.show()
+
+
+class VanillaRNN(Layer):
+    def __init__(self, output_size, state_size=100, input_size=None, seq_length=None):
+        super().__init__()
+        self.state_size = state_size
+        self.output_size = output_size
+        self.input_size = input_size
+        self.seq_length = seq_length
+        self.softmax = Softmax()
+        if seq_length is not None:
+            self.compile(seq_length)
+
+    def compile(self, input_shape):
+        super().compile(input_shape)  # Populates self.input_shape
+        self.output_shape = (self.output_size,)
+        self.__initialize_weights()
+        self.reset_state()
+    
+    def reset_state(self, state=None):
+        self.h = np.array(np.random.normal(0.0, 1./100.,
+                        (self.state_size,1)))
+        print(self.h.shape)
+
+    def __call__(self, inputs):
+        hidden = np.dot(self.W, self.h) + np.dot(self.U, inputs) + self.b
+        self.h = np.tanh(hidden)
+        output = np.dot(self.V, self.h) + self.c
+        return self.softmax(output)
+
+    def backward(self, in_gradient):
+        return super().backward(in_gradient)
+
+    def __initialize_weights(self):
+        self.W = np.array(np.random.normal(0.0, 1./100.,
+                    (self.state_size, self.state_size)))
+        self.U = np.array(np.random.normal(0.0, 1./100.,
+                    (self.state_size, self.input_size)))
+        self.b = np.array(np.random.normal(0.0, 1./100.,
+                    (self.state_size,1)))
+        self.V = np.array(np.random.normal(0.0, 1./100.,
+                    (self.output_size, self.state_size)))
+        self.c = np.array(np.random.normal(0.0, 1./100.,
+                    (self.output_size,1)))
