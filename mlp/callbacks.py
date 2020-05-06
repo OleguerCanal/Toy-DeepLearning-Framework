@@ -33,7 +33,8 @@ class MetricTracker(Callback):
     """ Tracks training metrics to plot and save afterwards
     """
 
-    def __init__(self):
+    def __init__(self, file_name="models/tracker"):
+        self.file_name = file_name
         self.train_losses = []
         self.val_losses = []
         self.train_metrics = []
@@ -50,7 +51,7 @@ class MetricTracker(Callback):
 
     def on_epoch_end(self, model):
         self.__track(model)
-        self.save("models/tracker")
+        self.save(self.file_name)
         pass
 
     def __track(self, model):
@@ -78,7 +79,7 @@ class MetricTracker(Callback):
         ax1.plot(list(range(len(self.train_losses))),
                  self.train_losses, label="Train loss", c="orange")
         ax1.tick_params(axis='y')
-        plt.legend(loc='center right')
+        plt.legend(loc='upper left')
 
         # Accuracies
         ax2 = ax1.twinx()
@@ -141,6 +142,12 @@ class MetricTracker(Callback):
         np.save(file + "_val_met", self.val_metrics)
         np.save(file + "_train_loss", self.train_losses)
         np.save(file + "_val_loss", self.val_losses)
+
+    def load(self, file):
+        self.train_metrics = np.load(file + "_train_met.npy").tolist()
+        self.val_metrics = np.load(file + "_val_met.npy").tolist()
+        self.train_losses = np.load(file + "_train_loss.npy").tolist()
+        self.val_losses = np.load(file + "_val_loss.npy").tolist()
 
 
 class BestModelSaver(Callback):
