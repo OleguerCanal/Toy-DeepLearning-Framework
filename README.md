@@ -20,7 +20,7 @@ The model (as for now) presents the following features:
 - **Losses:**
     - CrossEntropy
     - CategoricalHinge
-- **Optimization:** Minibatch Gradient Descent BackProp Training with customizable:
+- **Optimization:** Minibatch SGD BackProp Training with customizable:
     - Batch Size
     - Epochs / Iterations
     - Momentum
@@ -35,27 +35,36 @@ Code Example:
 ```python
 # Imports
 from mlp.callbacks import MetricTracker, LearningRateScheduler
-from mlp.layers import Dense, Softmax, Relu, Dropout
+from mlp.layers import Conv2D, Dense, MaxPool2D, Softmax, Relu, Dropout
 from mlp.losses import CrossEntropy
 from mlp.models import Sequential
 from mlp.metrics import Accuracy
 
 # Define model
 model = Sequential(loss=CrossEntropy(), metric=Accuracy())
-model.add(Dense(nodes=800, input_dim=x_train.shape[0]))
+model.add(Conv2D(num_filters=32, kernel_shape=(3, 3), stride=2, input_shape=(32, 32, 3)))
+model.add(Relu())
+model.add(Conv2D(num_filters=64, kernel_shape=(3, 3)))
+model.add(Relu())
+model.add(MaxPool2D(kernel_shape=(2, 2), stride=2))
+model.add(Conv2D(num_filters=128, kernel_shape=(2, 2)))
+model.add(Relu())
+model.add(MaxPool2D(kernel_shape=(2, 2)))
+model.add(Flatten())
+model.add(Dense(nodes=200))
 model.add(Relu())
 model.add(Dropout(0.8))
-model.add(Dense(nodes=10, input_dim=800))
+model.add(Dense(nodes=10))
 model.add(Softmax())
 
 # Define callbacks
 mt = MetricTracker()  # Stores training evolution info (losses and metrics)
-lrs = LearningRateScheduler(evolution="cyclic", lr_min=1e-5, lr_max=1e-1)
+lrs = LearningRateScheduler(evolution="cyclic", lr_min=1e-4, lr_max=1e-1)
 callbacks = [mt, lrs]
 
 # Fit model
 model.fit(X=x_train, Y=y_train, X_val=x_val, Y_val=y_val,
-        batch_size=100, epochs=100, l2_reg=0.01, momentum=0.1,
+        batch_size=100, epochs=100, l2_reg=0.01, momentum=0.8,
         callbacks=callbacks)
 mt.plot_training_progress()
 
@@ -65,10 +74,10 @@ print("Test accuracy:", test_acc)
 ```
 
 Example of metrics tracked during training:
-![Training tracking](https://github.com/OleguerCanal/KTH_DeepLearning/blob/master/Assignment_2/figures/best.png)
+![Training tracking](https://github.com/OleguerCanal/KTH_DeepLearning/blob/master/Assignment_3/figures/overfit_test.png)
 
 
-**NOTE:** More architectures, layers and features (CNN, RBF, SOM, DBF) comming soon
+**NOTE:** More architectures, layers and features (LSTM, RBF, SOM, DBF) comming soon
 
 # Utilities
 
@@ -99,8 +108,8 @@ fixed_args = {  # These will be kept constant
 }
 
 def evaluator(x_train, y_train, x_val, y_val, **kwargs):
-    # Define model
-    model = Sequential(loss=CrossEntropy())
+    # Define model (ex: SVM)
+    model = Sequential(loss=CategoricalHinge())
     model.add(Dense(nodes=10, input_dim=x_train.shape[0]))
     model.add(Softmax())
 
