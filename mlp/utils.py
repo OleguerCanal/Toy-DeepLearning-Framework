@@ -72,3 +72,13 @@ def plot_confusion_matrix(Y_pred, Y_real, class_names, path=None):
 	if path is not None:
 		plt.savefig(path)
 	plt.show()
+
+def one_hotify(x, num_classes):
+	size = 1
+	try:
+		size = x.size
+	except :
+		pass
+	one_hot = np.zeros((size, num_classes))
+	one_hot[np.arange(size), x] = 1
+	return one_hot.T
