@@ -9,9 +9,8 @@ import pickle
 import sys
 import pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
-from utils import minibatch_split
 
-# from callbacks import Callback, LearningRateScheduler
+from batchers import FeedForwardBatcher
 
 
 class Sequential:
@@ -28,11 +27,12 @@ class Sequential:
     def add(self, layer):
         """Add layer"""
         self.layers.append(layer)
-        if len(self.layers) > 1: # Compile layer using output shape of previous layer
-            assert(self.layers[-2].is_compiled)  # Input/Output shapes not set for previous layer!
+        if len(self.layers) > 1:  # Compile layer using output shape of previous layer
+            # Input/Output shapes not set for previous layer!
+            assert(self.layers[-2].is_compiled)
             # Set input shape to be previous layer output_shape
             self.layers[-1].compile(input_shape=self.layers[-2].output_shape)
-        # print(layer.input_shape)
+        print(layer.input_shape)
         # print(layer.output_shape)
 
     def predict(self, X, apply_dropout=True):
@@ -76,17 +76,22 @@ class Sequential:
                 w_norm += np.linalg.norm(layer.weights, 'fro')**2
         return loss_val + l2_reg*w_norm
 
-    def fit(self, X, Y, X_val=None, Y_val=None, batch_size=None, epochs=None,
-            iterations = None, lr=0.01, momentum=0.7, l2_reg=0.1,
-            shuffle_minibatch=True, compensate=False, callbacks=[], **kwargs):
+    def fit(self, X, Y=None, X_val=None, Y_val=None, batch_size=None,
+            epochs=None, iterations=None, lr=0.01, momentum=0.7, l2_reg=0.01,
+            batcher=None, callbacks=[], **kwargs):
         """ Performs backrpop with given parameters.
             save_path is where model of best val accuracy will be saved
         """
-        assert(epochs is None or iterations is None) # Only one can set it limit
+        assert(epochs is None or iterations is None)  # Only one can set it limit
+        assert(batcher is not None or batch_size is not None)  # You need to provide a batcher or a batch size
+
+        if batcher is None:
+            print("Using default batcher: FeedForwardBatcher")
+            batcher = FeedForwardBatcher(batch_size)
         if iterations is not None:
-            epochs = int(np.ceil(iterations/(X.shape[-1]/batch_size)))
+            epochs = int(np.ceil(iterations/(X.shape[-1]/batcher.batch_size)))
         else:
-            iterations = int(epochs*np.ceil((X.shape[-1]/batch_size)))
+            iterations = int(epochs*np.ceil((X.shape[-1]/batcher.batch_size)))
 
         # Store vars as class variables so they can be accessed by callbacks
         # TODO(think a better way)
@@ -94,7 +99,6 @@ class Sequential:
         self.Y = Y
         self.X_val = X_val
         self.Y_val = Y_val
-        self.batch_size = batch_size
         self.epochs = epochs
         self.lr = lr
         self.momentum = momentum
@@ -111,45 +115,38 @@ class Sequential:
 
         # Training
         stop = False
-        # pbar = tqdm(list(range(self.epochs)))
-        # for self.epoch in pbar:
-        for self.epoch in range(self.epochs):
-            for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch, compensate):
-                # t = time.time()
+        pbar = tqdm(list(range(self.epochs)))
+        for self.epoch in pbar:
+            # for self.epoch in range(self.epochs):
+            for X_minibatch, Y_minibatch in batcher(X, Y, model=self):
+                # print(np.argmax(X_minibatch, axis=0))
+                # print(np.argmax(Y_minibatch, axis=0))
+                # print("##")
                 self.Y_pred_prob = self.predict(X_minibatch)  # Forward pass
-                # print("forward_time:", time.time()-t)
-                # t = time.time()
                 gradient = self.loss.backward(
-                    self.Y_pred_prob, Y_minibatch)  # Loss grad
-                # print("loss_backward_time:", time.time()-t)
-                # print("backward")
+                    self.Y_pred_prob, Y_minibatch)   # Loss grad
                 for layer in reversed(self.layers):  # Backprop (chain rule)
-                    # t = time.time()
                     gradient = layer.backward(
                         in_gradient=gradient,
-                        lr=self.lr,  # Trainable layer parameters
+                        lr=self.lr,                  # Trainable layer parameters
                         momentum=self.momentum,
                         l2_regularization=self.l2_reg)
-                    # print("gradient_time:", layer, time.time()-t)
-                # t = time.time()
                 # Call callbacks
                 for callback in callbacks:
-                    callback.on_batch_end(self)
+                    callback.on_batch_end(self, Y_real=Y_minibatch)
                 if self.t >= iterations:
                     stop = True
                     break
                 self.t += 1  # Step counter
-                # print("batch_callbacks_time:", layer, time.time()-t)
-            # t = time.time()
+                # print(self.t)
             # Call callbacks
             for callback in callbacks:
                 callback.on_epoch_end(self)
-            # print("epoch_callbacks_time:", layer, time.time()-t)
 
             # Update progressbar
-            # pbar.set_description("Train acc: " + str(np.round(self.train_metric*100, 2)) +\
-            #                      "% Val acc: " + str(np.round(self.val_metric*100, 2)) +\
-            #                      "% Train Loss: " + str(np.round(self.train_loss)))
+            pbar.set_description("Train acc: " + str(np.round(self.train_metric*100, 2)) +
+                                 "% Val acc: " + str(np.round(self.val_metric*100, 2)) +
+                                 "% Train Loss: " + str(np.round(self.train_loss)))
             if stop:
                 break
 

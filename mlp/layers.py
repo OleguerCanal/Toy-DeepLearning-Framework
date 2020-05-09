@@ -24,21 +24,22 @@ class Layer(ABC):
         self.is_compiled = False
         self.input_shape = None
         self.output_shape = None
-        # NOTE: INPUT/OUTPUT shapes ignore 
+        # NOTE: INPUT/OUTPUT shapes ignore
 
     @abstractmethod
     def compile(self, input_shape):
         """ Updates self.input_shape (and self.output_shape)
             If input_dim not set by user, when added to a model 
             this method is called based on previous layer output_shape
-            
+
             For trainable layers, it also should initializes weights and
             gradient placeholders according to input_shape.
-            
+
             Note: input_shape should be a tuple of the shape
             ignoring the number of samples (last elem)
         """
-        input_shape = input_shape if type(input_shape) is tuple else (input_shape, )
+        input_shape = input_shape if type(
+            input_shape) is tuple else (input_shape, )
         self.input_shape = input_shape
         self.is_compiled = True
         # print("compiled")
@@ -53,14 +54,16 @@ class Layer(ABC):
         """ Receives right-layer gradient and multiplies it by current layer gradient """
         pass
 
+
 class ConstantShapeLayer(Layer):
     """ Common structure of Layers which do not modify the shape of input and output
     """
-    def __init__(self, input_shape = None):
+
+    def __init__(self, input_shape=None):
         super().__init__()
         if input_shape is not None:
             self.compile(input_shape)
-        
+
     def compile(self, input_shape):
         super().compile(input_shape)  # Populates self.input_shape and self.is_compiled
         self.output_shape = self.input_shape
@@ -79,6 +82,7 @@ class Softmax(ConstantShapeLayer):
         gradient = np.einsum("ijk,jk->ik", (diags - out_prod), in_gradient)
         return gradient
 
+
 class Relu(ConstantShapeLayer):
     def __call__(self, x):
         self.inputs = x
@@ -89,6 +93,8 @@ class Relu(ConstantShapeLayer):
         return np.multiply((self.inputs > 0), in_gradient)
 
 # MISC LAYERS ###########################################################
+
+
 class Dropout(ConstantShapeLayer):
     def __init__(self, ones_ratio=0.7):
         self.name = "Dropout"
@@ -96,12 +102,14 @@ class Dropout(ConstantShapeLayer):
 
     def __call__(self, x, apply=True):
         if apply:
-            self.mask = np.random.choice([0, 1], size=(x.shape), p=[1 - self.ones_ratio, self.ones_ratio])
+            self.mask = np.random.choice([0, 1], size=(x.shape), p=[
+                                         1 - self.ones_ratio, self.ones_ratio])
             return np.multiply(self.mask, x)
         return x
 
     def backward(self, in_gradient, **kwargs):
         return np.multiply(self.mask, in_gradient)
+
 
 class Flatten(Layer):
     def __init__(self, input_shape=None):
@@ -124,27 +132,30 @@ class Flatten(Layer):
 
 
 class MaxPool2D(Layer):
-    def __init__(self, kernel_shape = (2, 2), stride = 1, input_shape=None):
+    def __init__(self, kernel_shape=(2, 2), stride=1, input_shape=None):
         super().__init__()
         self.kernel_shape = kernel_shape
-        self.stride = stride  # TODO(oleguer) Implement stride
+        self.s = stride  # TODO(oleguer) Implement stride
         if input_shape is not None:
             self.compile(input_shape)  # Only care about channels
 
     def compile(self, input_shape):
-        assert(len(input_shape) == 3) # Input shape must be (height, width, channels,)
+        # Input shape must be (height, width, channels,)
+        assert(len(input_shape) == 3)
         super().compile(input_shape)
         (ker_h, ker_w) = self.kernel_shape
-        out_h = input_shape[0] - ker_h + 1
-        out_w = input_shape[1] - ker_w + 1
+        out_h = int((input_shape[0] - ker_h)/self.s) + 1
+        out_w = int((input_shape[1] - ker_w)/self.s) + 1
         self.output_shape = (out_h, out_w, input_shape[2],)
 
     def __call__(self, inputs):
         """ Forward pass of MaxPool2D
             input should have shape (height, width, channels, n_images)
         """
-        assert(len(inputs.shape) == 4) # Input must have shape (height, width, channels, n_images)
-        assert(inputs.shape[:3] == self.input_shape)  # Set input shape does not match with input sent
+        assert(len(inputs.shape) ==
+               4)  # Input must have shape (height, width, channels, n_images)
+        # Set input shape does not match with input sent
+        assert(inputs.shape[:3] == self.input_shape)
 
         # Get shapes
         (ker_h, ker_w) = self.kernel_shape
@@ -152,11 +163,13 @@ class MaxPool2D(Layer):
 
         # Compute convolution
         self.inputs = inputs  # Will be used in back pass
-        output = np.empty(shape = self.output_shape + (self.inputs.shape[3],))
+        output = np.empty(shape=self.output_shape + (self.inputs.shape[3],))
         for i in range(out_h):
             for j in range(out_w):
                 # TODO(oleguer): Not sure if np.amax is parallel, look into  numexpr
-                output[i, j, :, :] = np.amax(inputs[i:i+ker_h, j:j+ker_w, :, :], axis=(0, 1,))
+                in_block = self.inputs[self.s*i:self.s *
+                                       i+ker_h, self.s*j:self.s*j+ker_w, :, :]
+                output[i, j, :, :] = np.amax(in_block, axis=(0, 1,))
         return output
 
     def backward(self, in_gradient, **kwargs):
@@ -164,21 +177,29 @@ class MaxPool2D(Layer):
         # Get shapes
         (out_h, out_w, n_channels, n_points) = in_gradient.shape
         (ker_h, ker_w) = self.kernel_shape
-        
-        assert(out_h == self.output_shape[0])  # Incoming gradient shape must match layer output shape
-        assert(out_w == self.output_shape[1])  # Incoming gradient shape must match layer output shape
+
+        # Incoming gradient shape must match layer output shape
+        assert(out_h == self.output_shape[0])
+        # Incoming gradient shape must match layer output shape
+        assert(out_w == self.output_shape[1])
 
         # Instantiate gradients
-        left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
+        left_layer_gradient = np.zeros(
+            self.input_shape + (in_gradient.shape[-1],))
         for i in range(out_h):
             for j in range(out_w):
-                in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
-                mask = np.equal(in_block, np.amax(in_block, axis=(0, 1,))).astype(int)
+                in_block = self.inputs[self.s*i:self.s *
+                                       i+ker_h, self.s*j:self.s*j+ker_w, :, :]
+                mask = np.equal(in_block, np.amax(
+                    in_block, axis=(0, 1,))).astype(int)
                 masked_gradient = mask*in_gradient[i, j, :, :]
-                left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] += masked_gradient
+                left_layer_gradient[self.s*i:self.s*i+ker_h,
+                                    self.s*j:self.s*j+ker_w, :, :] += masked_gradient
         return left_layer_gradient
 
 # TRAINABLE LAYERS ######################################################
+
+
 class Dense(Layer):
     def __init__(self, nodes, input_dim=None, weight_initialization="in_dim"):
         super().__init__()
@@ -201,7 +222,7 @@ class Dense(Layer):
     def backward(self, in_gradient, lr=0.001, momentum=0.7, l2_regularization=0.1):
         # Previous layer error propagation
         # Remove bias TODO Think about this
-        left_layer_gradient = (np.dot(self.weights.T,in_gradient))[:-1, :]
+        left_layer_gradient = (np.dot(self.weights.T, in_gradient))[:-1, :]
 
         # Regularization
         regularization_weights = copy.deepcopy(self.weights)
@@ -211,7 +232,8 @@ class Dense(Layer):
 
         # Weight update
         # TODO: Rremove self if not going to update it
-        self.gradient = np.dot(in_gradient, self.inputs.T) + regularization_term
+        self.gradient = np.dot(
+            in_gradient, self.inputs.T) + regularization_term
         self.dw = momentum*self.dw + (1-momentum)*self.gradient
         self.weights -= lr*self.dw
         return left_layer_gradient
@@ -234,20 +256,26 @@ class Dense(Layer):
 
 
 class Conv2D(Layer):
-    def __init__(self, num_filters = 5, kernel_shape = (5, 5), stride = 1, input_shape=None):
+    def __init__(self, num_filters=5, kernel_shape=(5, 5), stride=1, dilation_rate=1, input_shape=None):
         super().__init__()
         self.num_filters = num_filters
+        self.s = stride
+        self.dilation = dilation_rate
         self.kernel_shape = kernel_shape
-        self.stride = stride  # TODO(oleguer) Implement stride
+        aug_ker_h = (self.kernel_shape[0]-1)*self.dilation + 1
+        aug_ker_w = (self.kernel_shape[1]-1)*self.dilation + 1
+        # Kernel size considering dilation_rate
+        self.aug_kernel_shape = (aug_ker_h, aug_ker_w)
         if input_shape is not None:
             self.compile(input_shape)  # Only care about channels
 
     def compile(self, input_shape):
-        assert(len(input_shape) == 3) # Input shape must be (height, width, channels,)
+        # Input shape must be (height, width, channels,)
+        assert(len(input_shape) == 3)
         super().compile(input_shape)
-        (ker_h, ker_w) = self.kernel_shape
-        out_h = input_shape[0] - ker_h + 1
-        out_w = input_shape[1] - ker_w + 1
+        (ker_h, ker_w) = self.aug_kernel_shape
+        out_h = int((input_shape[0] - ker_h)/self.s) + 1
+        out_w = int((input_shape[1] - ker_w)/self.s) + 1
         self.output_shape = (out_h, out_w, self.num_filters,)
         self.__initialize_weights()
 
@@ -256,22 +284,26 @@ class Conv2D(Layer):
             input should have shape (height, width, channels, n_images)
             channels should match kernel_shape
         """
-        assert(len(inputs.shape) == 4) # Input must have shape (height, width, channels, n_images)
-        assert(inputs.shape[:3] == self.input_shape)  # Set input shape does not match with input sent
-        assert(self.filters.shape[3] == inputs.shape[2])  # Filter number of channels must match input channels
+        assert(len(inputs.shape) == 4)  # Input (height, width, channels, n_images)
+        # Set input shape does not match with input sent
+        assert(inputs.shape[:3] == self.input_shape)
+        # Filter number of channels must match input channels
+        assert(self.filters.shape[3] == inputs.shape[2])
 
         # Get shapes
-        (ker_h, ker_w) = self.kernel_shape
+        (aug_ker_h, aug_ker_w) = self.aug_kernel_shape
         (out_h, out_w, _,) = self.output_shape
 
         # Compute convolution
         self.inputs = inputs  # Will be used in back pass
-        output = np.empty(shape = self.output_shape + (self.inputs.shape[3],))
+        output = np.empty(shape=self.output_shape + (self.inputs.shape[3],))
         for i in range(out_h):
             for j in range(out_w):
-                output[i, j, :, :] = einsum("ijcn,kijc->kn",\
-                     inputs[i:i+ker_h, j:j+ker_w, :, :], self.filters)
-        
+                in_block = inputs[self.s*i:self.s*i+aug_ker_h:self.dilation,
+                                  self.s*j:self.s*j+aug_ker_w:self.dilation, :, :]
+                output[i, j, :, :] = einsum(
+                    "ijcn,kijc->kn", in_block, self.filters)
+
         # Add biases
         output += einsum("ijcn,c->ijcn", np.ones(output.shape), self.biases)
         return output
@@ -281,26 +313,40 @@ class Conv2D(Layer):
         """
         # Get shapes
         (out_h, out_w, _, _) = in_gradient.shape
-        (ker_h, ker_w) = self.kernel_shape
-        assert(out_h == self.output_shape[0])  # Incoming gradient shape must match layer output shape
-        assert(out_w == self.output_shape[1])  # Incoming gradient shape must match layer output shape
+        (aug_ker_h, aug_ker_w) = self.aug_kernel_shape
+
+        # Incoming gradient shape must match layer output shape
+        assert(out_h == self.output_shape[0])
+        # Incoming gradient shape must match layer output shape
+        assert(out_w == self.output_shape[1])
 
         # Instantiate gradients
-        left_layer_gradient = np.zeros(self.input_shape + (in_gradient.shape[-1],))
-        self.filter_gradients = np.zeros(self.filters.shape)  # Save it to compare with numerical (DEBUG)
+        left_layer_gradient = np.zeros(
+            self.input_shape + (in_gradient.shape[-1],))
+        # Save it to compare with numerical (DEBUG)
+        self.filter_gradients = np.zeros(self.filters.shape)
         self.bias_gradients = np.sum(in_gradient, axis=(0, 1, 3))
 
         for i in range(out_h):
             for j in range(out_w):
-                in_block = self.inputs[i:i+ker_h, j:j+ker_w, :, :]
+                in_block = self.inputs[self.s*i:self.s*i+aug_ker_h:self.dilation,
+                                       self.s*j:self.s*j+aug_ker_w:self.dilation, :, :]
                 grad_block = in_gradient[i, j, :, :]
                 filter_grad = einsum("ijcn,kn->kijc", in_block, grad_block)
                 self.filter_gradients += filter_grad
-                left_layer_gradient[i:i+ker_h, j:j+ker_w, :, :] +=\
+                left_layer_gradient[self.s*i:self.s*i+aug_ker_h:self.dilation,
+                                    self.s*j:self.s*j+aug_ker_w:self.dilation, :, :] +=\
                     einsum("kijc,kn->ijcn", self.filters, grad_block)
 
-        self.dw = momentum*self.dw + (1-momentum)*self.filter_gradients
-        self.filters -= lr*self.dw  #TODO(oleguer): Add regularization
+
+        self.filter_gradients += 2*l2_regularization*self.filters
+
+        if np.array_equal(self.dw, np.zeros(self.filters.shape)):
+            self.dw = self.filter_gradients
+        else:
+            self.dw = momentum*self.dw + (1-momentum)*self.filter_gradients
+
+        self.filters -= lr*self.dw  # TODO(oleguer): Add regularization
         self.biases -= lr*self.bias_gradients
         return left_layer_gradient
 
@@ -317,7 +363,7 @@ class Conv2D(Layer):
                 kernel = np.expand_dims(kernel, axis=2)
             self.filters.append(kernel)
         self.filters = np.array(self.filters)
-        self.dw = 0
+        self.dw = np.zeros(self.filters.shape)
 
     def show_filters(self):
         import matplotlib.pyplot as plt
@@ -325,3 +371,108 @@ class Conv2D(Layer):
         for i in range(self.filters.shape[0]):
             axes[i].imshow(self.filters[i][:, :, 0])
         plt.show()
+
+
+class VanillaRNN(Layer):
+    def __init__(self, output_size, state_size=100, input_size=None):
+        super().__init__()
+        self.EPS_ = 1e-8
+        self.state_size = state_size
+        self.output_size = output_size
+        self.input_size = input_size
+        self.softmax = Softmax()
+        if input_size is not None:
+            self.compile(input_size)
+
+    def compile(self, input_shape):
+        super().compile(input_shape)  # Populates self.input_shape
+        self.output_shape = (self.output_size,)
+        self.__initialize_weights()
+        self.reset_state()
+    
+    def reset_state(self, state=None):
+        self.m_w = np.zeros(self.W.shape)
+        self.m_u = np.zeros(self.U.shape)
+        self.m_v = np.zeros(self.V.shape)
+        if state is None:
+            self.h = np.zeros((self.state_size, 1))
+        else:
+            self.h = state
+
+    def __call__(self, inputs):
+        outputs = np.empty(inputs.shape)
+        self.inputs = inputs
+        self.states = np.empty((self.h.shape[0], inputs.shape[1]))
+        self.a_ts = []
+        for indx in range(inputs.shape[1]):
+            x = np.expand_dims(inputs[:, indx], axis=1)
+            a_t = np.dot(self.W, self.h) + np.dot(self.U, x) + self.b
+            self.a_ts.append(a_t)
+            self.h = np.tanh(a_t)
+            self.states[:, indx] = self.h[:, 0]
+            outputs[:, indx] = self.softmax(np.dot(self.V, self.h) + self.c).flatten()
+        # print("outputs")
+        # print(outputs)
+        # import sys
+        # sys.exit()
+        return outputs
+
+    def backward(self, in_gradient, lr=0.001, momentum=0.9, l2_regularization=0.1):
+        in_gradient = self.softmax.backward(in_gradient)  # Apply softmax TODO(oleguer): Maybe this should be a different layer set by user
+
+        # Compute dl_dh, dl_da backtracking
+        tau = in_gradient.shape[-1] - 1
+        dl_dh_t = np.dot(in_gradient[:, tau].T, self.V)
+        mat = np.diag(1-np.square(np.tanh(self.a_ts[tau][:, 0])))
+        dl_da_t = np.dot(dl_dh_t, mat)
+        dl_dh = [dl_dh_t]
+        dl_da = [dl_da_t]  # g_t
+        for t in reversed(list(range(tau))):
+            dl_dh_t = np.dot(in_gradient[:, t].T, self.V) + np.dot(dl_da_t, self.W)
+            dl_da_t = np.dot(dl_dh_t, np.diag(1-np.square(np.tanh(self.a_ts[t][:, 0]))))
+            dl_dh.insert(0, dl_dh_t)
+            dl_da.insert(0, dl_da_t)
+
+        # Compute dl_dw, dl_du, dl_dv
+        dl_dw = np.zeros(self.W.shape)
+        dl_du = np.zeros(self.U.shape)
+        dl_dv = np.zeros(self.V.shape)
+        for t in range(0, tau+1):
+            dl_da_t = np.expand_dims(dl_da[t], axis=1)
+            do_dt = np.expand_dims(in_gradient[:, t], axis=1)
+            h_t = np.expand_dims(self.states[:, t], axis=1).T
+            x_t = np.expand_dims(self.inputs[:, t], axis=1).T
+            dl_dw += np.dot(dl_da_t, h_t)
+            dl_du += np.dot(dl_da_t, x_t)
+            dl_dv += np.dot(do_dt, h_t)
+
+        # Only for debugging gradients
+        # self.dl_dw = dl_dw
+        # self.dl_du = dl_du
+        # self.dl_dv = dl_dv
+
+        if np.array_equal(self.m_w, np.zeros(self.W.shape)):
+            self.m_w = np.square(dl_dw)
+            self.m_u = np.square(dl_du)
+            self.m_v = np.square(dl_dv)
+        else:
+            self.m_w = momentum*self.m_w + (1-momentum)*np.square(dl_dw)
+            self.m_u = momentum*self.m_u + (1-momentum)*np.square(dl_du)
+            self.m_v = momentum*self.m_v + (1-momentum)*np.square(dl_dv)
+        self.W = self.W - lr*np.multiply(np.reciprocal(np.sqrt(self.m_w + self.EPS_)), dl_dw)
+        self.U = self.U - lr*np.multiply(np.reciprocal(np.sqrt(self.m_u + self.EPS_)), dl_du)
+        self.V = self.V - lr*np.multiply(np.reciprocal(np.sqrt(self.m_v + self.EPS_)), dl_dv)
+
+    def __initialize_weights(self):
+        self.W = np.array(np.random.normal(0.0, 1./100.,
+                    (self.state_size, self.state_size)))
+        self.U = np.array(np.random.normal(0.0, 1./100.,
+                    (self.state_size, self.input_size)))
+        # self.b = np.array(np.random.normal(0.0, 1./100.,
+        #             (self.state_size,1)))
+        self.V = np.array(np.random.normal(0.0, 1./100.,
+                    (self.output_size, self.state_size)))
+        # self.c = np.array(np.random.normal(0.0, 1./100.,
+        #             (self.output_size,1)))
+        self.b = np.zeros((self.state_size,1))
+        self.c = np.zeros((self.output_size,1))
