@@ -111,9 +111,9 @@ class Sequential:
 
         # Training
         stop = False
-        pbar = tqdm(list(range(self.epochs)))
-        for self.epoch in pbar:
-        # for self.epoch in range(self.epochs):
+        # pbar = tqdm(list(range(self.epochs)))
+        # for self.epoch in pbar:
+        for self.epoch in range(self.epochs):
             for X_minibatch, Y_minibatch in minibatch_split(X, Y, batch_size, shuffle_minibatch, compensate):
                 # t = time.time()
                 self.Y_pred_prob = self.predict(X_minibatch)  # Forward pass
@@ -147,9 +147,9 @@ class Sequential:
             # print("epoch_callbacks_time:", layer, time.time()-t)
 
             # Update progressbar
-            pbar.set_description("Train acc: " + str(np.round(self.train_metric*100, 2)) +\
-                                 "% Val acc: " + str(np.round(self.val_metric*100, 2)) +\
-                                 "% Train Loss: " + str(np.round(self.train_loss)))
+            # pbar.set_description("Train acc: " + str(np.round(self.train_metric*100, 2)) +\
+            #                      "% Val acc: " + str(np.round(self.val_metric*100, 2)) +\
+            #                      "% Train Loss: " + str(np.round(self.train_loss)))
             if stop:
                 break
 

@@ -78,7 +78,7 @@ class MetricTracker(Callback):
         ax1.plot(list(range(len(self.train_losses))),
                  self.train_losses, label="Train loss", c="orange")
         ax1.tick_params(axis='y')
-        plt.legend(loc='center right')
+        plt.legend(loc='upper left')
 
         # Accuracies
         ax2 = ax1.twinx()

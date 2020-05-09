@@ -71,4 +71,4 @@ def plot_confusion_matrix(Y_pred, Y_real, class_names, path=None):
 	sn.heatmap(df_cm, robust=True, square=True,annot=True, fmt='g')
 	if path is not None:
 		plt.savefig(path)
-	plt.show()
+	# plt.show()
