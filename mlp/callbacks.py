@@ -16,11 +16,11 @@ class Callback(ABC):
     def on_training_begin(self, model):
         pass
 
-    def on_batch_end(self, model):
+    def on_batch_end(self, model, **kwargs):
         pass
 
     # @abstractmethod
-    def on_epoch_end(self, model):
+    def on_epoch_end(self, model, **kwargs):
         """ Getss called at the end of each epoch
             Can modify model training variables (eg: LR Scheduler)
             Can store information to be retrieved afterwards (eg: Metric Tracker)
@@ -33,38 +33,56 @@ class MetricTracker(Callback):
     """ Tracks training metrics to plot and save afterwards
     """
 
-    def __init__(self, file_name="models/tracker"):
+    def __init__(self, file_name="models/tracker", frequency=1):
         self.file_name = file_name
         self.train_losses = []
         self.val_losses = []
         self.train_metrics = []
         self.val_metrics = []
         self.learning_rates = []
+        self.frequency = frequency
+        self.iteration = 0
 
     def on_training_begin(self, model):
         self.metric_name = model.metric.name
         # self.__track(model)
 
-    def on_batch_end(self, model):
-        # self.__track(model)
+    def on_batch_end(self, model, Y_real=None):
+        if (self.iteration%self.frequency == 0):
+            self.__batch_track(model, Y_real)
+            self.save(self.file_name)
+        self.iteration += 1
         pass
 
     def on_epoch_end(self, model):
-        self.__track(model)
-        self.save(self.file_name)
+        # self.__track(model)
+        # self.save(self.file_name)
         pass
+
+    def __batch_track(self, model, Y_real=None):
+        if Y_real is None:
+            return
+        metric = model.metric(model.Y_pred_prob, Y_real)
+        loss = model.loss(model.Y_pred_prob, Y_real)
+        self.train_metrics.append(metric)
+        self.train_losses.append(loss)
+        # self.learning_rates.append(model.lr)
+        model.train_metric = metric
+        model.train_loss = loss
 
     def __track(self, model):
         train_metric, train_loss = model.get_metric_loss(model.X, model.Y, use_dropout=False)
-        val_metric, val_loss = model.get_metric_loss(model.X_val, model.Y_val, use_dropout=False)
         self.train_losses.append(train_loss)
-        self.val_losses.append(val_loss)
         self.train_metrics.append(train_metric)
-        self.val_metrics.append(val_metric)
         self.learning_rates.append(model.lr)
-        model.val_metric = val_metric
         model.train_metric = train_metric
         model.train_loss = train_loss
+
+        if model.X_val is not None and model.Y_val is not None:
+            val_metric, val_loss = model.get_metric_loss(model.X_val, model.Y_val, use_dropout=False)
+            self.val_losses.append(val_loss)
+            self.val_metrics.append(val_metric)
+            model.val_metric = val_metric
 
     def plot_training_progress(self, show=True, save=False, name="model_results", subtitle=None):
         fig, ax1 = plt.subplots()
@@ -72,10 +90,11 @@ class MetricTracker(Callback):
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
         ax1.set_ylim(bottom=0)
-        ax1.set_ylim(top=1.25*np.nanmax(self.val_losses))
-        if len(self.val_losses) > 0:
-            ax1.plot(list(range(len(self.val_losses))),
-                     self.val_losses, label="Val loss", c="red")
+        ax1.set_ylim(top=1.25*np.nanmax(self.train_losses))
+        if self.val_losses is not None:
+            if len(self.val_losses) > 0:
+                ax1.plot(list(range(len(self.val_losses))),
+                        self.val_losses, label="Val loss", c="red")
         ax1.plot(list(range(len(self.train_losses))),
                  self.train_losses, label="Train loss", c="orange")
         ax1.tick_params(axis='y')
@@ -85,15 +104,16 @@ class MetricTracker(Callback):
         ax2 = ax1.twinx()
         ax2.set_ylabel(self.metric_name)
         ax2.set_ylim(bottom=0)
-        ax2.set_ylim(top=1)
+        ax2.set_ylim(top=1.2)
         n = len(self.train_metrics)
         ax2.plot(list(range(n)),
                  np.array(self.train_metrics), label="Train acc", c="green")
-        if len(self.val_metrics) > 0:
-            n = len(self.val_metrics)
-            ax2.plot(list(range(n)),
-                     np.array(self.val_metrics), label="Val acc", c="blue")
-        ax2.tick_params(axis='y')
+        if self.val_metrics is not None:
+            if len(self.val_metrics) > 0:
+                n = len(self.val_metrics)
+                ax2.plot(list(range(n)),
+                        np.array(self.val_metrics), label="Val acc", c="blue")
+            ax2.tick_params(axis='y')
 
         # plt.tight_layout()
         plt.suptitle("Training Evolution")
@@ -137,6 +157,8 @@ class MetricTracker(Callback):
             plt.show()
 
     def save(self, file):
+        directory = "/".join(file.split("/")[:-1])
+        pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
         # np.save(file + "_lr", self.learning_rates)
         np.save(file + "_train_met", self.train_metrics)
         np.save(file + "_val_met", self.val_metrics)

@@ -28,32 +28,6 @@ def plot(flatted_image, shape=(32, 32, 3), order='F'):
 def accuracy(Y_pred_classes, Y_real):
 	return np.sum(np.multiply(Y_pred_classes, Y_real))/Y_pred_classes.shape[1]
 
-def minibatch_split(X, Y, batch_size, shuffle=True, compansate=False):
-	"""Yields splited X, Y matrices in minibatches of given batch_size"""
-	if (batch_size is None) or (batch_size > X.shape[-1]):
-		batch_size = X.shape[-1]
-
-	if not compansate:
-		indx = list(range(X.shape[-1]))
-		if shuffle:
-			np.random.shuffle(indx)
-		for i in range(int(X.shape[-1]/batch_size)):
-			pos = i*batch_size
-			# Get minibatch
-			X_minibatch = X[..., indx[pos:pos+batch_size]]
-			Y_minibatch = Y[..., indx[pos:pos+batch_size]]
-			if i == int(X.shape[-1]/batch_size) - 1:  # Get all the remaining
-				X_minibatch = X[..., indx[pos:]]
-				Y_minibatch = Y[..., indx[pos:]]
-			yield X_minibatch, Y_minibatch
-	else:
-		class_sum = np.sum(Y, axis=1)*Y.shape[0]
-		class_count = np.reciprocal(class_sum, where=abs(class_sum) > 0)
-		x_probas = np.dot(class_count, Y)
-		n = X.shape[-1]
-		for i in range(int(n/batch_size)):
-			indxs = np.random.choice(range(n), size=batch_size, replace=True, p=x_probas)
-			yield X[..., indxs], Y[..., indxs]
 
 def plot_confusion_matrix(Y_pred, Y_real, class_names, path=None):
 	heatmap = np.zeros((Y_pred.shape[0], Y_pred.shape[0]))
@@ -82,3 +56,23 @@ def one_hotify(x, num_classes):
 	one_hot = np.zeros((size, num_classes))
 	one_hot[np.arange(size), x] = 1
 	return one_hot.T
+
+def stringify(encoded_string, ind_to_char):
+	string = ''
+	elems = np.argmax(encoded_string, axis=0)
+	for elem in elems:
+		string += ind_to_char[elem]
+	return string
+
+def generate_sequence(rnn_layer, first_elem, ind_to_char, char_to_ind, length=10):
+	k = len(ind_to_char)
+	x = np.array([char_to_ind[elem] for elem in first_elem])
+	x = one_hotify(x, num_classes = k)
+	string = first_elem
+	for i in range(length):
+		probs = rnn_layer(x)
+		string += stringify(probs, ind_to_char)
+		next_elem = np.argmax(probs, axis=0)
+		pred = [ind_to_char[elem] for elem in next_elem]
+		x = one_hotify(next_elem, k)
+	print(string)
