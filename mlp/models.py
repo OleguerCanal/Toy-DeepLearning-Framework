@@ -135,6 +135,7 @@ class Sequential:
                 for callback in callbacks:
                     callback.on_batch_end(self, Y_real=Y_minibatch)
                 if self.t >= iterations:
+                    print("Stopping")
                     stop = True
                     break
                 self.t += 1  # Step counter
@@ -146,8 +147,9 @@ class Sequential:
             # Update progressbar
             pbar.set_description("Train acc: " + str(np.round(self.train_metric*100, 2)) +
                                  "% Val acc: " + str(np.round(self.val_metric*100, 2)) +
-                                 "% Train Loss: " + str(np.round(self.train_loss)))
+                                 "% Train Loss: " + str(np.round(self.train_loss, 2)))
             if stop:
+                print("Stopping")
                 break
 
     # IO functions ################################################
