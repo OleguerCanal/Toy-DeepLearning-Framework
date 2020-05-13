@@ -376,11 +376,10 @@ class Conv2D(Layer):
 class VanillaRNN(Layer):
     def __init__(self, output_size, state_size=100, input_size=None):
         super().__init__()
-        self.EPS_ = 1e-8
+        self.EPS_ = 1e-9
         self.state_size = state_size
         self.output_size = output_size
         self.input_size = input_size
-        self.softmax = Softmax()
         if input_size is not None:
             self.compile(input_size)
 
@@ -389,28 +388,44 @@ class VanillaRNN(Layer):
         self.output_shape = (self.output_size,)
         self.__initialize_weights()
         self.reset_state()
-    
-    def reset_state(self, state=None):
         self.m_w = np.zeros(self.W.shape)
         self.m_u = np.zeros(self.U.shape)
         self.m_v = np.zeros(self.V.shape)
+        self.m_b = np.zeros(self.b.shape)
+        self.m_c = np.zeros(self.c.shape)
+    
+    def reset_state(self, state=None):
         if state is None:
             self.h = np.zeros((self.state_size, 1))
         else:
             self.h = state
+        # print("reset")
+        # self.m_w = np.zeros(self.W.shape)
+        # self.m_u = np.zeros(self.U.shape)
+        # self.m_v = np.zeros(self.V.shape)
+        # self.m_b = np.zeros(self.b.shape)
+        # self.m_c = np.zeros(self.c.shape)
 
     def __call__(self, inputs):
-        outputs = np.empty(inputs.shape)
+        # print("call")
+        # print(np.sum(np.abs(self.h)))
+        # print(self.h.shape)
+
+        outputs = np.zeros(inputs.shape)
         self.inputs = inputs
-        self.states = np.empty((self.h.shape[0], inputs.shape[1]))
+        self.states = []
         self.a_ts = []
         for indx in range(inputs.shape[1]):
             x = np.expand_dims(inputs[:, indx], axis=1)
             a_t = np.dot(self.W, self.h) + np.dot(self.U, x) + self.b
-            self.a_ts.append(a_t)
             self.h = np.tanh(a_t)
-            self.states[:, indx] = self.h[:, 0]
-            outputs[:, indx] = self.softmax(np.dot(self.V, self.h) + self.c).flatten()
+            o_t = np.dot(self.V, self.h) + self.c
+            outputs[:, indx] = o_t.flatten()
+            # save stuff
+            self.a_ts.append(a_t)
+            self.states.append(self.h[:, 0])
+
+        # print(np.sum(np.abs(self.h)))
         # print("outputs")
         # print(outputs)
         # import sys
@@ -418,8 +433,6 @@ class VanillaRNN(Layer):
         return outputs
 
     def backward(self, in_gradient, lr=0.001, momentum=0.9, l2_regularization=0.1):
-        in_gradient = self.softmax.backward(in_gradient)  # Apply softmax TODO(oleguer): Maybe this should be a different layer set by user
-
         # Compute dl_dh, dl_da backtracking
         tau = in_gradient.shape[-1] - 1
         dl_dh_t = np.dot(in_gradient[:, tau].T, self.V)
@@ -437,31 +450,57 @@ class VanillaRNN(Layer):
         dl_dw = np.zeros(self.W.shape)
         dl_du = np.zeros(self.U.shape)
         dl_dv = np.zeros(self.V.shape)
+        dl_dc = np.zeros(self.c.shape)
+        dl_db = np.zeros(self.b.shape)
         for t in range(0, tau+1):
             dl_da_t = np.expand_dims(dl_da[t], axis=1)
             do_dt = np.expand_dims(in_gradient[:, t], axis=1)
-            h_t = np.expand_dims(self.states[:, t], axis=1).T
+            h_t = np.expand_dims(self.states[t], axis=1).T
             x_t = np.expand_dims(self.inputs[:, t], axis=1).T
-            dl_dw += np.dot(dl_da_t, h_t)
+            if t > 0:
+                h_t_1 = np.expand_dims(self.states[t-1], axis=1).T
+                dl_dw += np.dot(dl_da_t, h_t_1)
             dl_du += np.dot(dl_da_t, x_t)
             dl_dv += np.dot(do_dt, h_t)
+            dl_dc += do_dt
+            dl_db += dl_da_t
 
         # Only for debugging gradients
         # self.dl_dw = dl_dw
         # self.dl_du = dl_du
         # self.dl_dv = dl_dv
+        # self.dl_db = dl_db
+        # self.dl_dc = dl_dc
+        
+        # Avoid exploding gradients
+        dl_dw = np.clip(dl_dw, -5, 5)
+        dl_du = np.clip(dl_du, -5, 5)
+        dl_dv = np.clip(dl_dv, -5, 5)
+        dl_db = np.clip(dl_db, -5, 5)
+        dl_dc = np.clip(dl_dc, -5, 5)
 
         if np.array_equal(self.m_w, np.zeros(self.W.shape)):
             self.m_w = np.square(dl_dw)
             self.m_u = np.square(dl_du)
             self.m_v = np.square(dl_dv)
+            self.m_b = np.square(dl_db)
+            self.m_c = np.square(dl_dc)
         else:
-            self.m_w = momentum*self.m_w + (1-momentum)*np.square(dl_dw)
-            self.m_u = momentum*self.m_u + (1-momentum)*np.square(dl_du)
-            self.m_v = momentum*self.m_v + (1-momentum)*np.square(dl_dv)
+            self.m_w = 0.9*self.m_w + 0.1*np.square(dl_dw)
+            self.m_u = 0.9*self.m_u + 0.1*np.square(dl_du)
+            self.m_v = 0.9*self.m_v + 0.1*np.square(dl_dv)
+            self.m_b = 0.9*self.m_b + 0.1*np.square(dl_db)
+            self.m_c = 0.9*self.m_c + 0.1*np.square(dl_dc)
+        # self.m_w += np.square(dl_dw)
+        # self.m_u += np.square(dl_du)
+        # self.m_v += np.square(dl_dv)
+        # self.m_b += np.square(dl_db)
+        # self.m_c += np.square(dl_dc)
         self.W = self.W - lr*np.multiply(np.reciprocal(np.sqrt(self.m_w + self.EPS_)), dl_dw)
         self.U = self.U - lr*np.multiply(np.reciprocal(np.sqrt(self.m_u + self.EPS_)), dl_du)
         self.V = self.V - lr*np.multiply(np.reciprocal(np.sqrt(self.m_v + self.EPS_)), dl_dv)
+        self.b = self.b - lr*np.multiply(np.reciprocal(np.sqrt(self.m_b + self.EPS_)), dl_db)
+        self.c = self.c - lr*np.multiply(np.reciprocal(np.sqrt(self.m_c + self.EPS_)), dl_dc)
 
     def __initialize_weights(self):
         self.W = np.array(np.random.normal(0.0, 1./100.,
@@ -472,7 +511,7 @@ class VanillaRNN(Layer):
         #             (self.state_size,1)))
         self.V = np.array(np.random.normal(0.0, 1./100.,
                     (self.output_size, self.state_size)))
-        # self.c = np.array(np.random.normal(0.0, 1./100.,
+        # self.c = np.array(np.random.normal(0.0, 1./1000.,
         #             (self.output_size,1)))
         self.b = np.zeros((self.state_size,1))
         self.c = np.zeros((self.output_size,1))
