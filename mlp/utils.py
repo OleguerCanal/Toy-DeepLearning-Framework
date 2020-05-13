@@ -2,6 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
+import sys, pathlib
+sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
+from layers import Softmax
+
 def LoadBatch(filename):
 	""" Copied from the dataset website """
 	import pickle
@@ -65,6 +69,13 @@ def stringify(encoded_string, ind_to_char):
 	return string
 
 def generate_sequence(rnn_layer, first_elem, ind_to_char, char_to_ind, length=10):
+	# print(rnn_layer.h)
+	soft = Softmax()
+	def sample(array):
+		n = min(20, array.shape[0])
+		ind = np.argpartition(array, -n)[-n:]
+		indx = np.random.choice(ind, p=soft(array[ind]))
+		return indx
 	k = len(ind_to_char)
 	x = np.array([char_to_ind[elem] for elem in first_elem])
 	x = one_hotify(x, num_classes = k)
@@ -72,7 +83,9 @@ def generate_sequence(rnn_layer, first_elem, ind_to_char, char_to_ind, length=10
 	for i in range(length):
 		probs = rnn_layer(x)
 		string += stringify(probs, ind_to_char)
-		next_elem = np.argmax(probs, axis=0)
-		pred = [ind_to_char[elem] for elem in next_elem]
-		x = one_hotify(next_elem, k)
-	print(string)
+		next_elem = []
+		for j in range(probs.shape[-1]):
+			next_elem.append(sample(probs[:, j]))
+		x = one_hotify(np.array(next_elem), k)
+		# print(np.average(np.abs(rnn_layer.h)))
+	return string
