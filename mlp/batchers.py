@@ -1,4 +1,5 @@
 import numpy as np
+from utils import stringify
 
 class FeedForwardBatcher:
     def __init__(self, batch_size, shuffle=True, compansate=False):
@@ -35,10 +36,11 @@ class FeedForwardBatcher:
                 yield X[..., indxs], Y[..., indxs]
 
 class RnnBatcher:
-    def __init__(self, seq_length):
+    def __init__(self, seq_length, ind_to_char=None):
         self.pos = 0
         self.seq_length = seq_length
         self.batch_size = 1
+        self.ind_to_char = ind_to_char
 
     def __call__(self, X, *args, **kwargs):
         self.pos = 0
@@ -46,5 +48,11 @@ class RnnBatcher:
         while self.pos + self.seq_length + 1 <= X.shape[1]:
             x = X[:, self.pos:self.pos+self.seq_length]
             y = X[:, self.pos + 1:self.pos + self.seq_length + 1]
-            self.pos += 1
+            self.pos += self.seq_length
+            # if self.ind_to_char is not None:
+            #     x_str = stringify(x, self.ind_to_char)
+            #     y_str = stringify(y, self.ind_to_char)
+            #     print("x:", x_str)
+            #     print("y:", y_str)
+            #     print("####")
             yield x, y
