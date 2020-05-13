@@ -8,6 +8,7 @@ import pathlib
 import os
 sys.path.append(str(pathlib.Path(__file__).parent.absolute()))
 from models import Sequential
+from mlp.utils import generate_sequence
 
 class Callback(ABC):
     """ Abstract class to hold callbacks
@@ -64,11 +65,17 @@ class MetricTracker(Callback):
             return
         metric = model.metric(model.Y_pred_prob, Y_real)
         loss = model.loss(model.Y_pred_prob, Y_real)
-        self.train_metrics.append(metric)
-        self.train_losses.append(loss)
-        # self.learning_rates.append(model.lr)
-        model.train_metric = metric
-        model.train_loss = loss
+        if self.iteration == 0:
+            self.metric = metric
+            self.loss = loss
+
+        self.metric = 0.99*self.metric + 0.01*metric
+        self.loss = 0.99*self.loss + 0.01*loss
+
+        self.train_metrics.append(self.metric)
+        self.train_losses.append(self.loss)
+        model.train_metric = self.metric
+        model.train_loss = self.loss
 
     def __track(self, model):
         train_metric, train_loss = model.get_metric_loss(model.X, model.Y, use_dropout=False)
@@ -90,7 +97,7 @@ class MetricTracker(Callback):
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
         ax1.set_ylim(bottom=0)
-        ax1.set_ylim(top=1.25*np.nanmax(self.train_losses))
+        ax1.set_ylim(top=1.25*np.clip(np.nanmax(self.train_losses), 0, 100))
         if self.val_losses is not None:
             if len(self.val_losses) > 0:
                 ax1.plot(list(range(len(self.val_losses))),
@@ -124,6 +131,7 @@ class MetricTracker(Callback):
         if save:
             directory = "/".join(name.split("/")[:-1])
             pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+            print(name + ".png")
             plt.savefig(name + ".png")
             plt.close()
         if show:
@@ -166,6 +174,7 @@ class MetricTracker(Callback):
         np.save(file + "_val_loss", self.val_losses)
 
     def load(self, file):
+        self.metric_name = "Accuracy"
         self.train_metrics = np.load(file + "_train_met.npy").tolist()
         self.val_metrics = np.load(file + "_val_met.npy").tolist()
         self.train_losses = np.load(file + "_train_loss.npy").tolist()
@@ -198,6 +207,29 @@ class BestModelSaver(Callback):
         best_model.layers = self.best_model_layers
         return best_model
 
+
+class TextSynthesiser(Callback):
+    def __init__(self, ind_to_char, char_to_ind, first_letter='H', seq_length=200, frequency=50000, file_name="models/TextSynthesiser"):
+        self.iteration = 0
+        self.file = file_name
+        self.seq_length = seq_length
+        self.ind_to_char = ind_to_char
+        self.char_to_ind = char_to_ind
+        self.frequency = frequency
+        self.first_letter = first_letter
+
+        # Create folder if does not exist
+        directory = "/".join(file_name.split("/")[:-1])
+        pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+
+    def on_batch_end(self, model, **kwargs):
+        if self.iteration%self.frequency == 0:
+            layer = copy.deepcopy(model.layers[0])
+            string = generate_sequence(layer, self.first_letter, self.ind_to_char, self.char_to_ind, length=self.seq_length)
+            file_name = self.file + "_" +  str(self.iteration) + ".txt"
+            with open(file_name, "w") as text_file:
+                text_file.write(string)
+        self.iteration += 1
 
 # LEARNING PARAMS MODIFIER CALLBACKS ######################################################
 
