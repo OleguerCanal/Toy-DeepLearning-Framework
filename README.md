@@ -14,7 +14,7 @@ Allows to Build, Train and Assess a modular Multi-Layer-Perceptron Squential arc
 The model (as for now) presents the following features:
 
 - **Layers:**
-    - Trainable: Dense, Conv2D
+    - Trainable: Dense, Conv2D, VanillaRNN
     - Activation: Relu, Softmax
     - Regularization: Dropout, MaxPool2D
 - **Losses:**
